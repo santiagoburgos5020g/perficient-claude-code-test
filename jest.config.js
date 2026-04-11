@@ -12,9 +12,11 @@ const customJestConfig = {
     '^@/(.*)$': '<rootDir>/$1',
   },
   collectCoverageFrom: [
-    'features/**/components/**/*.tsx',
-    '!features/**/components/**/*.test.tsx',
-    '!features/**/components/**/*.spec.tsx',
+    '**/*.tsx',
+    '!**/*.test.tsx',
+    '!**/*.spec.tsx',
+    '!**/node_modules/**',
+    '!**/.next/**',
   ],
   coverageThreshold: {
     global: {

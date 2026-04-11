@@ -3,8 +3,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // Pre-push TDD enforcement.
-// Scans ALL component files in features/*/components/*.tsx
-// and blocks the push if any component is missing tests,
+// Scans ALL .tsx files in the project and blocks the push
+// if any .tsx file is missing a co-located test file,
 // has failing tests, or has less than 100% coverage.
 
 interface Violation {
@@ -19,17 +19,20 @@ interface Violation {
   };
 }
 
-function findComponentFiles(dir: string, pattern: RegExp): string[] {
+const IGNORED_DIRS = ['node_modules', '.next', 'coverage', '.git', '.playwright-mcp'];
+
+function findTsxFiles(dir: string): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
   for (const entry of entries) {
+    if (IGNORED_DIRS.includes(entry.name)) continue;
     const fullPath = path.join(dir, entry.name).replace(/\\/g, '/');
     if (entry.isDirectory()) {
-      results.push(...findComponentFiles(fullPath, pattern));
+      results.push(...findTsxFiles(fullPath));
     } else if (
-      pattern.test(fullPath) &&
+      entry.name.endsWith('.tsx') &&
       !entry.name.match(/\.(test|spec)\.tsx$/)
     ) {
       results.push(fullPath);
@@ -69,25 +72,24 @@ function parseCoverage(
 }
 
 function main(): void {
-  console.log('Pre-push TDD Enforcement: Scanning all component files...');
+  console.log('Pre-push TDD Enforcement: Scanning all .tsx files...');
   console.log('');
 
-  // 1. Find ALL component .tsx files under features/**/components/
-  const componentPattern = /features\/.*\/components\/.*\.tsx$/;
-  const componentFiles = findComponentFiles('features', componentPattern);
+  // 1. Find ALL .tsx files in the project
+  const tsxFiles = findTsxFiles('.');
 
-  if (componentFiles.length === 0) {
-    console.log('No component files found. Skipping checks.');
+  if (tsxFiles.length === 0) {
+    console.log('No .tsx files found. Skipping checks.');
     process.exit(0);
   }
 
-  console.log(`Found ${componentFiles.length} component(s) to verify.`);
+  console.log(`Found ${tsxFiles.length} .tsx file(s) to verify.`);
   console.log('');
 
   // 2. Check each component
   const violations: Violation[] = [];
 
-  for (const component of componentFiles) {
+  for (const component of tsxFiles) {
     const normalizedComponent = component.replace(/\\/g, '/');
     const testFile = normalizedComponent.replace(/\.tsx$/, '.test.tsx');
 
