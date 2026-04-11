@@ -1,0 +1,1 @@
+npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/check-tdd-push.ts
