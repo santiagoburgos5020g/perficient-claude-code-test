@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 interface Violation {
-  type: 'missing' | 'coverage';
+  type: 'missing' | 'coverage' | 'failing';
   componentPath: string;
   expectedTestPath?: string;
   coverage?: {
@@ -104,9 +104,10 @@ function main(): void {
         }
       }
     } catch {
-      // Jest failed — parse coverage if available
+      // Jest failed — determine if tests failed or coverage is insufficient
       const coverageSummaryPath = path.join('coverage', 'coverage-summary.json');
       let coverageData = { lines: 0, branches: 0, functions: 0, statements: 0 };
+      let hasCoverage = false;
 
       if (fs.existsSync(coverageSummaryPath)) {
         try {
@@ -122,6 +123,7 @@ function main(): void {
                 );
 
           if (fileKey && summary[fileKey]) {
+            hasCoverage = true;
             coverageData = {
               lines: summary[fileKey].lines.pct,
               branches: summary[fileKey].branches.pct,
@@ -134,11 +136,26 @@ function main(): void {
         }
       }
 
-      violations.push({
-        type: 'coverage',
-        componentPath: normalizedComponent,
-        coverage: coverageData,
-      });
+      // If coverage is 100% but Jest failed, it means tests are failing
+      const fullCoverage =
+        hasCoverage &&
+        coverageData.lines === 100 &&
+        coverageData.branches === 100 &&
+        coverageData.functions === 100 &&
+        coverageData.statements === 100;
+
+      if (fullCoverage) {
+        violations.push({
+          type: 'failing',
+          componentPath: normalizedComponent,
+        });
+      } else {
+        violations.push({
+          type: 'coverage',
+          componentPath: normalizedComponent,
+          coverage: coverageData,
+        });
+      }
     }
   }
 
@@ -175,6 +192,17 @@ function printViolations(violations: Violation[]): void {
       console.error(
         '  Commit blocked. Create the test file with 100% coverage.'
       );
+    } else if (v.type === 'failing') {
+      console.error('  One or more tests are FAILING for:');
+      console.error('');
+      console.error(`    Component: ${v.componentPath}`);
+      console.error('');
+      console.error('  Commit blocked. Fix failing tests before committing.');
+      console.error(
+        '  Run: npx jest ' +
+          v.componentPath.replace(/\.tsx$/, '.test.tsx') +
+          ' --verbose'
+      );
     } else {
       console.error('  Insufficient test coverage for:');
       console.error('');
@@ -207,6 +235,8 @@ function printViolations(violations: Violation[]): void {
       console.error(`  ${i + 1}. ${v.componentPath}`);
       if (v.type === 'missing') {
         console.error('     -> Missing test file');
+      } else if (v.type === 'failing') {
+        console.error('     -> Tests are FAILING');
       } else {
         console.error(
           `     -> Coverage: Lines ${v.coverage!.lines}%, ` +
