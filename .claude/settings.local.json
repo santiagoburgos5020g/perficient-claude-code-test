@@ -6,8 +6,6 @@
       "Bash(mkdir -p public)",
       "Bash(npm install:*)",
       "Bash(npx prisma:*)",
-      "mcp__playwright__browser_take_screenshot",
-      "mcp__playwright__browser_press_key",
       "Bash(npx husky:*)",
       "Bash(npx jest:*)",
       "mcp__chrome-devtools__take_snapshot",
@@ -17,7 +15,10 @@
       "mcp__chrome-devtools__evaluate_script",
       "mcp__chrome-devtools__press_key",
       "mcp__chrome-devtools__fill",
-      "mcp__chrome-devtools__list_pages"
+      "mcp__chrome-devtools__list_pages",
+      "mcp__chrome-devtools__resize_page",
+      "mcp__chrome-devtools__emulate",
+      "mcp__chrome-devtools__list_console_messages"
     ]
   }
 }
