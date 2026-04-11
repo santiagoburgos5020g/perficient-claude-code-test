@@ -9,7 +9,12 @@
       "mcp__playwright__browser_take_screenshot",
       "mcp__playwright__browser_press_key",
       "Bash(npx husky:*)",
-      "Bash(npx jest:*)"
+      "Bash(npx jest:*)",
+      "mcp__chrome-devtools__take_snapshot",
+      "mcp__chrome-devtools__navigate_page",
+      "mcp__chrome-devtools__take_screenshot",
+      "mcp__chrome-devtools__click",
+      "mcp__chrome-devtools__evaluate_script"
     ]
   }
 }
