@@ -8,3 +8,6 @@ tsconfig.tsbuildinfo
 
 # Test coverage
 coverage/
+
+# Playwright MCP screenshots
+.playwright-mcp/

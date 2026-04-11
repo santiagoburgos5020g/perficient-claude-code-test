@@ -5,7 +5,11 @@
       "Bash(mkdir -p styles)",
       "Bash(mkdir -p public)",
       "Bash(npm install:*)",
-      "Bash(npx prisma:*)"
+      "Bash(npx prisma:*)",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_press_key",
+      "Bash(npx husky:*)",
+      "Bash(npx jest:*)"
     ]
   }
 }
