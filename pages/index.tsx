@@ -8,7 +8,7 @@ export default function Home() {
     useInfiniteScroll();
 
   return (
-    <div className="px-4 py-4 bg-white min-h-screen">
+    <div className="bg-white min-h-screen w-full">
       {isInitialLoading && <LoadingSpinner centered />}
 
       {error && products.length === 0 && !isInitialLoading && (

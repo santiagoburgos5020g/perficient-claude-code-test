@@ -11,7 +11,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   const [imgError, setImgError] = useState(false);
 
   return (
-    <article className="bg-white shadow-md hover:shadow-xl rounded-none p-4 transition-shadow duration-200">
+    <article className="bg-white shadow-md hover:shadow-xl rounded-none p-4 transition-shadow duration-200 flex flex-col">
       <div className="aspect-square overflow-hidden relative mb-3">
         {imgError ? (
           <div className="bg-gray-200 w-full h-full flex items-center justify-center">
@@ -31,6 +31,14 @@ export default function ProductCard({ product }: ProductCardProps) {
       <h2 className="font-bold text-base text-perficient-dark">{product.name}</h2>
       <p className="font-normal text-sm text-perficient-dark/70 mt-1">{product.description}</p>
       <p className="font-bold text-base text-perficient-dark mt-2">{formatPrice(product.price)}</p>
+      <button
+        type="button"
+        className="w-full bg-perficient-teal text-white text-sm font-normal py-3 mt-auto rounded-none cursor-default"
+        onClick={() => {}}
+        aria-label={`Add ${product.name} to cart`}
+      >
+        Add To Cart
+      </button>
     </article>
   );
 }
