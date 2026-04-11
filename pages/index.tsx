@@ -13,7 +13,7 @@ export default function Home() {
 
       {error && products.length === 0 && !isInitialLoading && (
         <div className="flex justify-center items-center min-h-[50vh]">
-          
+
         </div>
       )}
 
