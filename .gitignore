@@ -11,3 +11,6 @@ coverage/
 
 # Playwright MCP screenshots
 .playwright-mcp/
+
+# Claude Code local settings (contains tokens)
+.claude/settings.local.json
