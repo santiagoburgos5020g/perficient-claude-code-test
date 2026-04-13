@@ -7,3 +7,8 @@ All rules are defined in `.claude/rules/`. They are automatically loaded by Clau
 ## Database Schema
 
 For database-related operations, reference the Prisma schema at `prisma/schema.prisma`. This file contains the Product model and database configuration.
+
+
+## Agents
+
+The `.claude/agents/` folder already exists. When adding new agents, place them inside `.claude/agents/`.
