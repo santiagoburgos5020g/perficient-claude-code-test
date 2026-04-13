@@ -2,27 +2,48 @@
 name: qa-visual-tester
 description: Opens browser and QA-tests all pages using chrome-devtools — verifies rendering, spinners, infinite scroll, forms, navigation across desktop/tablet/mobile viewports
 disable-model-invocation: true
-allowed-tools: Bash, Read, Write, Glob, Grep, Edit, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__press_key, mcp__chrome-devtools__evaluate_script, mcp__chrome-devtools__list_pages
+allowed-tools: Bash, Read, Write, Glob, Grep, Edit, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__press_key, mcp__chrome-devtools__evaluate_script, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__close_page
 ---
 
 # QA Visual Tester
 
 Automated QA testing skill that behaves like a real end-user — starts the dev server, opens the browser via MCP chrome-devtools, navigates every page, and verifies rendering, interactions, and responsiveness across desktop, tablet, and mobile viewports.
 
+## Time Tracking
+
+Record timestamps at these moments to populate the Test History table:
+
+| Marker | When to capture | Column |
+|--------|----------------|--------|
+| **Start Process Time** | The very first action (before starting dev server, reading files, etc.) | `Start Process Time` |
+| **Start Testing Time** | Right before navigating to the first page for testing (after dev server is ready, routes discovered, test files read) | `Start Testing Time` |
+| **End Testing Time** | Right after the last browser test completes (before cleanup, report generation, stopping server) | `End Testing Time` |
+| **End Process Time** | The very last action (after report is written, server stopped, cleanup done) | `End Process Time` |
+
+Derived columns:
+- **Testing Time** = End Testing Time - Start Testing Time
+- **Process Time** = End Process Time - Start Process Time
+
+Use `date +%H:%M` (or equivalent) to capture each timestamp. All times in HH:MM format.
+
 ## Workflow Overview
 
-1. Start dev server (`npm run dev`)
-2. Connect to browser via chrome-devtools
-3. Discover all routes from `pages/` directory
-4. Read all `.test.tsx` files for expected behaviors
-5. Test every page across 3 viewports (desktop, tablet, mobile)
-6. Test all interactive elements (spinners, infinite scroll, forms, buttons, navigation)
-7. Verify behaviors defined in `.test.tsx` files
-8. Verify API endpoints
-9. Screenshot and log any issues found
-10. Generate/update QA report
-11. Stop the dev server
-12. Report results to the user
+1. **Record Start Process Time** ← capture timestamp now
+2. Start dev server (`npm run dev`)
+3. Connect to browser via chrome-devtools
+4. Discover all routes from `pages/` directory
+5. Read all `.test.tsx` files for expected behaviors
+6. **Record Start Testing Time** ← capture timestamp now
+7. Test every page across 3 viewports (desktop, tablet, mobile)
+8. Test all interactive elements (spinners, infinite scroll, forms, buttons, navigation)
+9. Verify behaviors defined in `.test.tsx` files
+10. Verify API endpoints
+11. **Record End Testing Time** ← capture timestamp now
+12. Screenshot and log any issues found
+13. Generate/update QA report
+14. Close the browser and stop the dev server
+15. Report results to the user
+16. **Record End Process Time** ← capture timestamp now
 
 ---
 
@@ -184,70 +205,30 @@ Also check the browser console for JS errors using `mcp__chrome-devtools__evalua
 
 ## Step 10 — Generate QA Report
 
-**Always** generate a report at: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.md`
+**Always** generate a report at: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.html`
 
-Use this template:
+The report is an HTML file. Use `chrome-dev-tools/qa-ai/2026-04-11/qa-report.html` as the reference template for structure and styling. When generating or updating the report:
 
-```markdown
-# QA Visual Test Report
+1. **Read the existing `qa-report.html`** to get the current HTML structure, styles, and data
+2. **Update all sections** with the new run's data (Run Info, Summary, Pages Tested, .test.tsx Coverage, API Endpoint, Interactive Elements, Issues Found)
+3. **Add a new row** to the Test Run History `<tbody>` at the top (most recent first)
+4. **Increment the Run number** based on existing rows in the history table
 
-## Run Info
-- **Date**: {YYYY-MM-DD}
-- **Time**: {HH:MM}
-- **Run**: Run {n} (increment based on existing Test History entries for today)
-- **Dev Server Port**: {port}
-- **Total Pages Tested**: {count}
-- **Viewports**: Desktop (1920x1080), Tablet (768x1024), Mobile (375x812)
+The Test Run History table uses this column structure with grouped headers:
 
-## Summary
-- **Total Checks**: {number}
-- **Passed**: {number}
-- **Failed**: {number}
-- **Warnings**: {number}
-- **Overall Status**: PASS / FAIL
+| Group | Column | Format |
+|-------|--------|--------|
+| (none) | Run | Run {n} |
+| Process | Start Date Time | YYYY-MM-DD HH:MM |
+| Process | End Date Time | YYYY-MM-DD HH:MM |
+| Testing | Start Date Time | YYYY-MM-DD HH:MM |
+| Testing | End Date Time | YYYY-MM-DD HH:MM |
+| Duration | Testing Time | {Xm Ys} |
+| Duration | Process Time | {Xm Ys} |
+| Result | Status | PASS / FAIL badge |
+| Result | Issues | count |
 
-## Pages Tested
-
-### / (Homepage)
-| Check | Desktop | Tablet | Mobile |
-|-------|---------|--------|--------|
-| Page renders | PASS/FAIL | PASS/FAIL | PASS/FAIL |
-| Loading spinner | PASS/FAIL | PASS/FAIL | PASS/FAIL |
-| Infinite scroll | PASS/FAIL | PASS/FAIL | PASS/FAIL |
-| Product cards | PASS/FAIL | PASS/FAIL | PASS/FAIL |
-| Navigation | PASS/FAIL | PASS/FAIL | PASS/FAIL |
-| Responsive layout | N/A | PASS/FAIL | PASS/FAIL |
-
-### /orders
-| Check | Desktop | Tablet | Mobile |
-|-------|---------|--------|--------|
-| ... | ... | ... | ... |
-
-### /users
-| Check | Desktop | Tablet | Mobile |
-|-------|---------|--------|--------|
-| ... | ... | ... | ... |
-
-## .test.tsx Coverage
-| Test File | Behavior | Status |
-|-----------|----------|--------|
-| pages/index.test.tsx | renders loading spinner | VERIFIED/FAILED/SKIPPED |
-| ... | ... | ... |
-
-## Issues Found
-### Issue 1: {title}
-- **Page**: {route}
-- **Viewport**: {size}
-- **Severity**: Critical/Major/Minor/Info
-- **Description**: {what happened}
-- **Expected**: {what should have happened}
-- **Screenshot**: `screenshots/{filename}.png`
-
-## Test History
-| Date | Time | Run | Status | Issues |
-|------|------|-----|--------|--------|
-| {date} | {HH:MM} | Run {n} | PASS/FAIL | {count} |
-```
+Use the CSS classes from the template: `td-process`, `td-testing`, `td-dur`, `td-center`, `badge-pass`/`badge-fail`, `issues-zero`/`issues-nonzero`, `empty` (for `--` values).
 
 **Report update rules:**
 - If the report already exists for today, **append** the new run (incrementing the Run number) to the "Test History" table and update the latest results in all sections above
@@ -255,12 +236,13 @@ Use this template:
 - If **no issues** found AND the date folder has no other files besides the report, **delete** the entire `{YYYY-MM-DD}` folder
 - If issues are found, keep screenshots and reference them in the "Issues Found" section as normal
 
-## Step 11 — Stop the Dev Server
+## Step 11 — Close Browser and Stop the Dev Server
 
-1. Stop the `npm run dev` background process
-2. Verify the port is freed
-3. If the process won't stop, force-kill it and warn the user
-4. **This step MUST execute regardless of test success or failure**
+1. Close all browser pages opened during testing using `mcp__chrome-devtools__close_page`
+2. Stop the `npm run dev` background process
+3. Verify the port is freed
+4. If the process won't stop, force-kill it and warn the user
+5. **This step MUST execute regardless of test success or failure**
 
 ## Step 12 — Report Results to User
 
@@ -278,9 +260,9 @@ Summarize in the conversation:
 - **MUST use MCP chrome-devtools exclusively** — NEVER use Playwright, Puppeteer, Selenium, or any other browser automation tool
 - All file operations must stay within the project directory
 - Screenshots: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/screenshots/`
-- Report: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.md`
+- Report: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.html`
 - Always generate the report (even when all tests pass)
-- Always stop the dev server when done (even on failure)
+- Always close the browser and stop the dev server when done (even on failure)
 - Report progress to the user as testing proceeds — do not run silently
 - Timeout: if a page takes > 30 seconds to load, flag as issue and move on
 - Use descriptive screenshot filenames: `{route}-{viewport}-{issue-slug}.png`

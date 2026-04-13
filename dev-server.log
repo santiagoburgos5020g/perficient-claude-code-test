@@ -1,0 +1,13 @@
+
+> nextjs-ecommerce@0.1.0 dev
+> next dev
+
+  ▲ Next.js 14.2.29
+  - Local:        http://localhost:3000
+  - Environments: .env.development, .env
+
+ ✓ Starting...
+ ✓ Ready in 28.7s
+ ○ Compiling / ...
+ ✓ Compiled / in 777ms (305 modules)
+ GET / 200 in 2593ms

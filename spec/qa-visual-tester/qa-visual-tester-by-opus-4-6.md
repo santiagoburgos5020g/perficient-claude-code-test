@@ -211,7 +211,7 @@ When any issue is found during testing:
 
 ### Step 10 — Generate QA Report
 
-1. **Always** generate a report at: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.md`
+1. **Always** generate a report at: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.html`
 2. The report must follow this structure:
 
 ```markdown
@@ -301,7 +301,7 @@ When any issue is found during testing:
 - **MUST use MCP chrome-devtools exclusively** for all browser interactions — NEVER use Playwright, Puppeteer, Selenium, or any other browser automation
 - All file operations must stay within the project directory (per project rule in `.claude/rules/folder-restriction.md`)
 - Screenshots path: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/screenshots/`
-- Report path: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.md`
+- Report path: `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.html`
 - The report is always generated (even when all tests pass) to maintain testing history
 - The date folder is only deleted when there are zero issues AND no prior history in that folder
 - Dev server must be stopped after testing completes, regardless of success or failure
@@ -318,7 +318,7 @@ When any issue is found during testing:
 ## Outputs
 
 - **Screenshots**: Saved in `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/screenshots/` for any issues found
-- **QA Report**: Markdown file at `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.md` with full test summary and history
+- **QA Report**: HTML file at `chrome-dev-tools/qa-ai/{YYYY-MM-DD}/qa-report.html` with full test summary and history
 - **Console output**: Real-time progress updates during testing (which page/viewport is being tested, pass/fail per check)
 
 ## Edge Cases
