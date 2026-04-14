@@ -1,0 +1,3 @@
+- [Hook pattern](feedback_hook_pattern.md) — Use Bash(*git *) with leading wildcard; Bash(git *) misses cd-prefixed commands
+- [Agent invocation](feedback_agent_must_be_invoked.md) — Agent must be proactively launched by Claude before any git operation
+- [Protected branches](project_protected_branches.md) — main and develop are protected; no direct commits/pushes
