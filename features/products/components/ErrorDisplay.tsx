@@ -2,7 +2,7 @@ interface ErrorDisplayProps {
   message: string;
   onRetry: () => void;
 }
-
+// abc
 export default function ErrorDisplay({ message, onRetry }: ErrorDisplayProps) {
   return (
     <div className="flex flex-col items-center gap-4 py-8">

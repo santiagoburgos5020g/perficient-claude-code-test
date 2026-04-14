@@ -1,15 +1,17 @@
 ---
-name: Branch creation must always be interactive
-description: During branch creation, always ask for branch type and name explicitly — never assume. If user has no name, suggest one and confirm.
+name: Branch creation must follow strict 3-step interactive flow
+description: Branch creation requires 3 sequential questions — type, name, then confirmation — asked one at a time. Never skip, combine, or reorder. Codified in agent-git-flow-enforcer.md.
 type: feedback
 ---
 
-When creating a branch, ALWAYS follow this mandatory interactive flow — no exceptions, no shortcuts:
+When creating a branch, ALWAYS follow this mandatory 3-step interactive flow — no exceptions, no shortcuts, no combining steps:
 
-1. **Always ask the branch type** — present the full list (feature, hotfix, bugfix, release, support) and wait for the user to choose. Even if the user's request implies a type, confirm it explicitly.
-2. **Always ask for the branch name** — do not assume or generate silently.
-3. **If the user doesn't provide a name** — suggest a contextual name and ask: "Would you like to use this name, or do you have a different one?" Wait for explicit confirmation before proceeding.
+1. **Step 1 — Ask branch type**: Present the full list (feature, hotfix, bugfix, release, support) and wait for the user to choose. Even if the user's request implies a type, confirm it explicitly. Do NOT proceed until the user answers.
+2. **Step 2 — Ask branch name**: Suggest 2–3 contextual names based on the work being done, but always allow the user to type their own custom name. Only the descriptive part is needed (e.g., `update-docs`). Do NOT proceed until the user answers.
+3. **Step 3 — Confirm before creating**: Show a full summary (full branch name, source branch, files to be staged/committed) and ask for explicit confirmation. Do NOT create the branch, stage, commit, or push anything until the user confirms.
 
-**Why:** The user wants full control over branch naming and type selection. Skipping these prompts leads to branches that don't match the user's intent or naming preferences.
+**Why:** The user wants full control over the branch creation process. Each question must be asked sequentially, one at a time, to ensure nothing is assumed or skipped. This is strictly enforced in the "Mandatory Interactive Branch Creation Flow" section of the agent definition file.
 
-**How to apply:** Every time you reach the branch creation phase (Step 3 in SKILL.md), follow substeps 3a, 3b, and 3c in order. Never skip 3a or 3b. Never create a branch without the user explicitly confirming both the type and the name.
+**How to apply:** Every time a new branch needs to be created, follow Steps 1 → 2 → 3 in exact order. Never skip any step. Never combine questions into a single prompt. Never execute git commands until Step 3 confirmation is received.
+
+**Critical:** Even if the parent agent pre-supplies the branch type, name, or both in the prompt, you MUST still show the full summary (full branch name, source branch, files to stage) and ask the user for explicit confirmation before creating anything. Pre-supplied info does NOT count as user confirmation — always ask.
