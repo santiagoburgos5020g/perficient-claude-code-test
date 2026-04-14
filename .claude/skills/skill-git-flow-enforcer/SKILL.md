@@ -23,13 +23,29 @@ Activate whenever you detect any of these situations:
 
 ## Git Flow Branch Reference
 
-| Type       | Prefix       | Created from | PR targets  | Purpose                            |
-|------------|-------------|-------------|-------------|------------------------------------|
-| Feature    | `feature/`  | `develop`   | `develop`   | New features and enhancements      |
-| Hotfix     | `hotfix/`   | `main`      | `main`      | Urgent fixes for production        |
-| Release    | `release/`  | `develop`   | `main`      | Preparing a new production release |
-| Bugfix     | `bugfix/`   | `develop`   | `develop`   | Bug fixes on the develop branch    |
-| Support    | `support/`  | `main`      | `main`      | Long-term support of older versions|
+| Type       | Prefix       | Created from             | PR targets                | Purpose                            |
+|------------|-------------|--------------------------|---------------------------|------------------------------------|
+| Feature    | `feature/`  | `develop`                | `develop`                 | New features and enhancements      |
+| Hotfix     | `hotfix/`   | `main`                   | `main` **AND** `develop`  | Urgent fixes for production        |
+| Release    | `release/`  | `develop`                | `main` **AND** `develop`  | Preparing a new production release |
+| Bugfix     | `bugfix/`   | `develop` or `release/*` | same as source branch     | Bug fixes (non-production)         |
+| Support    | `support/`  | `main`                   | N/A (long-lived)          | Long-term support of older versions|
+
+### Branch-from-Main Restriction
+
+**Only `hotfix/` and `support/` branches may be created from `main`.** All other branch types (`feature/`, `bugfix/`, `release/`) MUST be created from `develop` (or from a `release/*` branch in the case of `bugfix/`). If a user attempts to create a feature, bugfix, or release branch from `main`, **block it** and explain that they must branch from `develop` instead.
+
+### Dual-Merge Branches (Hotfix & Release)
+
+**Hotfix** and **Release** branches require merging into **TWO** targets:
+- **Hotfix** → PR to `main` AND PR to `develop` (so the fix reaches both production and the integration branch)
+- **Release** → PR to `main` AND PR to `develop` (so release changes like version bumps and last-minute fixes are not lost)
+
+**Hotfix exception:** If a `release/*` branch currently exists when finishing a hotfix, the hotfix should merge into `main` and the **release branch** (instead of `develop` directly), because the release branch will eventually carry the fix into `develop`.
+
+### Support Branches
+
+Support branches are long-lived and do **not** have a standard "finish" merge target. They exist to maintain older major versions that still need patches but cannot upgrade to the current version. Hotfixes for a support line stay within that support branch.
 
 ---
 
@@ -51,22 +67,49 @@ git branch --show-current
 
 **CRITICAL: If the user is on `main` or `develop`, do NOT write, modify, or stage any code. Stop immediately.**
 
-1. Tell the user: "You are on `{branch}`. Git Flow requires working on a dedicated branch."
-2. Present these options:
-   - `feature` — new features and enhancements
-   - `hotfix` — urgent production fixes
-   - `bugfix` — bug fixes on develop
-   - `release` — preparing a new release
-   - `support` — long-term support patches
-3. Ask the user to select a branch type
-4. Ask the user for the branch name/identifier (e.g., `ASU-188`, `add-dark-mode`, `v2.1.0`)
-5. Proceed to Step 3
+Tell the user: "You are on `{branch}`. Git Flow requires working on a dedicated branch." Then proceed to Step 3 (Branch Creation).
 
 ---
 
-## Step 3: Branch Creation
+## Step 3: Branch Creation — Mandatory Interactive Flow
 
-1. Determine the correct base branch from the reference table
+**Every time a branch needs to be created, you MUST follow this interactive flow. No exceptions — even if the user's request implies a branch type or name, always confirm explicitly.**
+
+### 3a. Ask for Branch Type
+
+Present these options and ask the user to select one:
+   - `feature` — new features and enhancements (from `develop`)
+   - `hotfix` — urgent production fixes (from `main`)
+   - `bugfix` — bug fixes (from `develop` or a `release/*` branch)
+   - `release` — preparing a new release (from `develop`)
+   - `support` — long-term support patches (from `main`)
+
+**Wait for the user to confirm the branch type before proceeding.** Do not assume or skip this step.
+
+**Enforce branch-from-main restriction:** If the user is currently on `main` and selects `feature`, `bugfix`, or `release`, **block** the creation and explain:
+- `feature` and `release` must be created from `develop`.
+- `bugfix` must be created from `develop` or a `release/*` branch.
+- Only `hotfix` and `support` can be created from `main`.
+
+### 3b. Ask for Branch Name
+
+Ask the user: "What name/identifier should the branch have? (e.g., `ASU-188`, `add-dark-mode`, `v2.1.0`)"
+
+**If the user provides a name:** use it.
+
+**If the user does NOT provide a name** (e.g., says "I don't know", "you pick", "whatever", or simply doesn't specify one):
+1. Generate a suggested name based on the context of what the user is trying to accomplish (e.g., `add-user-auth`, `fix-login-crash`, `v1.2.0`)
+2. Present the suggestion: "I suggest: `{type}/{suggested-name}`. Would you like to use this name, or do you have a different one in mind?"
+3. **Wait for the user to confirm or provide an alternative.** Do not proceed without explicit confirmation.
+
+### 3c. Create the Branch
+
+1. Determine the correct base branch from the reference table:
+   - `feature` → `develop`
+   - `hotfix` → `main`
+   - `release` → `develop`
+   - `bugfix` → `develop` (default) or a specific `release/*` branch if the user specifies. **Ask the user** if the bugfix is for a release branch or for develop.
+   - `support` → `main`
 2. Fetch and update the base branch:
    ```bash
    git fetch origin
@@ -153,20 +196,43 @@ Pulling from other branches is allowed on all Git Flow branches:
 
 **Only create a PR when the user explicitly says the work is ready and asks for it. Never auto-create PRs.**
 
-1. Determine the target branch per Git Flow rules:
-   - `feature/` → `develop`
-   - `hotfix/` → `main`
-   - `release/` → `main`
-   - `bugfix/` → `develop`
-   - `support/` → `main`
-2. **Confirm with the user:** "I'll create a PR from `{current-branch}` targeting `{target-branch}`. Is that correct?"
-3. **Wait for confirmation.** Do not proceed without it.
-4. If there are unpushed commits, push first (Step 5)
-5. Get commit history for the branch:
+### 7a. Determine PR target(s) per Git Flow rules
+
+**Single-target branches:**
+- `feature/` → `develop`
+- `bugfix/` → the branch it was created from (`develop` or the specific `release/*` branch)
+- `support/` → N/A (support branches are long-lived; PRs are not standard for them)
+
+**Dual-target branches (require TWO PRs):**
+- `hotfix/` → `main` **AND** `develop`
+- `release/` → `main` **AND** `develop`
+
+**Hotfix exception:** If a `release/*` branch currently exists, the second hotfix PR should target the `release/*` branch instead of `develop` (the release will eventually merge into develop).
+
+To check for an active release branch:
+```bash
+git branch -r --list 'origin/release/*'
+```
+
+### 7b. Confirm with the user
+
+**For single-target PRs:** "I'll create a PR from `{current-branch}` targeting `{target-branch}`. Is that correct?"
+
+**For dual-target PRs:** "Git Flow requires TWO PRs for `{branch-type}` branches. I'll create:
+1. PR from `{current-branch}` → `{first-target}` (primary)
+2. PR from `{current-branch}` → `{second-target}` (back-merge)
+Is that correct?"
+
+**Wait for confirmation.** Do not proceed without it.
+
+### 7c. Push and create PR(s)
+
+1. If there are unpushed commits, push first (Step 5)
+2. Get commit history for the branch:
    ```bash
    git log {target-branch}..HEAD --oneline
    ```
-6. Auto-generate PR title (under 70 characters) and description:
+3. Auto-generate PR title (under 70 characters) and description:
    ```markdown
    ## Summary
    - {bullet points from commit messages}
@@ -177,14 +243,25 @@ Pulling from other branches is allowed on all Git Flow branches:
    ## Commits
    - {list of commits}
    ```
-7. Create the PR:
+4. Create the PR:
    ```bash
    gh pr create --base {target-branch} --title "{title}" --body "$(cat <<'EOF'
    {description}
    EOF
    )"
    ```
-8. Return the PR URL to the user
+5. **For dual-target branches (hotfix/release):** Create the second PR targeting the second branch:
+   ```bash
+   gh pr create --base {second-target} --title "{title} (back-merge to {second-target})" --body "$(cat <<'EOF'
+   ## Summary
+   Back-merge of `{current-branch}` into `{second-target}` per Git Flow.
+
+   ## Branch
+   `{current-branch}` → `{second-target}`
+   EOF
+   )"
+   ```
+6. Return all PR URL(s) to the user
 
 ---
 
@@ -196,7 +273,10 @@ Pulling from other branches is allowed on all Git Flow branches:
 4. **Commit prefix** — auto-generated commits always start with the branch identifier
 5. **User message override** — if the user provides a commit message, use it exactly as-is
 6. **PR only on request** — never auto-create PRs
-7. **PR confirmation** — always confirm the target branch before creating a PR
+7. **PR confirmation** — always confirm the target branch(es) before creating a PR
 8. **No destructive git operations** — never run `git reset --hard`, `git clean -f`, `git checkout .`, or similar unless the user explicitly requests them
 9. **Fetch before branching** — always fetch and update the base branch before creating a new branch from it
 10. **No committing secrets** — never stage `.env`, credentials, or similar sensitive files
+11. **Branch-from-main restriction** — only `hotfix/` and `support/` branches may be created from `main`. Block `feature/`, `bugfix/`, and `release/` from `main`.
+12. **Dual PRs for hotfix and release** — `hotfix/` and `release/` branches always require TWO PRs: one to `main` and one to `develop` (or to the active `release/*` branch in the hotfix exception case)
+13. **Bugfix source tracking** — `bugfix/` branches merge back to the branch they were created from (`develop` or the specific `release/*` branch), never to `main`
