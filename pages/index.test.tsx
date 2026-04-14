@@ -3,6 +3,8 @@ import Home from './index';
 import { useInfiniteScroll } from '@/features/products/hooks/useInfiniteScroll';
 import React from 'react';
 
+//test
+
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props: any) => <img {...props} />,
