@@ -1,6 +1,7 @@
 {
   "env": {
-    "TDD_ENABLED": "false"
+    "TDD_ENABLED": "false",
+    "AGENT_GIT_FLOW_ENABLED": "false"
   },
   "hooks": {
     "PreToolUse": [
