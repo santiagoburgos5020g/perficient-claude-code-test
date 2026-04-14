@@ -357,6 +357,32 @@ Is that correct?"
 
 ---
 
+## Handling main/develop Divergence
+
+In correct Git Flow, `develop` should always be a **superset** of `main`. They stay in sync because:
+- **Release branches** merge into both `main` AND `develop`
+- **Hotfix branches** merge into both `main` AND `develop`
+
+If you detect that `main` has commits that `develop` does not (i.e., they have diverged), this means a release or hotfix was merged into `main` but not back-merged into `develop`.
+
+**What this agent must do when divergence is detected:**
+
+1. **STOP** — do not attempt to fix the divergence yourself
+2. **Report** the divergence to the caller with:
+   - The list of commits on `main` that are missing from `develop` (use `git log develop..main --oneline`)
+   - An explanation that this indicates a missed back-merge from a prior release or hotfix
+3. **Recommend** the correct fix to the caller:
+   - Create a `hotfix/sync-develop` branch from `main`
+   - This hotfix should PR into both `main` (no-op) and `develop` (carries the sync)
+   - Or, if the user has direct merge permissions, they can merge `main` into `develop` directly
+
+**What this agent must NOT do:**
+- Create branches with non-standard prefixes (e.g., `sync/`, `merge/`, `admin/`)
+- Directly merge `main` into `develop`
+- Attempt any autonomous resolution of the divergence
+
+---
+
 ## Hard Rules — Never Break These
 
 1. **No work on `main` or `develop`** — always require a branch before any code changes
@@ -373,3 +399,5 @@ Is that correct?"
 12. **Dual PRs for hotfix and release** — `hotfix/` and `release/` branches always require TWO PRs: one to `main` and one to `develop` (or to the active `release/*` branch in the hotfix exception case)
 13. **Bugfix source tracking** — `bugfix/` branches merge back to the branch they were created from (`develop` or the specific `release/*` branch), never to `main`
 14. **Release version validation** — before creating any `release/` branch, collect existing versions from git tags, remote release branches, GitHub releases, and GitHub tags (via MCP). Block duplicates, suggest next consecutive versions (patch/minor/major), and warn on non-consecutive jumps. Never create a release branch without completing this validation.
+15. **No non-standard branch prefixes** — ONLY create branches with the five standard Git Flow prefixes: `feature/`, `hotfix/`, `release/`, `bugfix/`, `support/`. Never invent custom prefixes (no `sync/`, `temp/`, `admin/`, `fix/`, `merge/`, etc.). If the requested operation does not fit any standard prefix, **stop and report** to the caller instead of improvising.
+16. **No autonomous sync or merge operations** — when asked to sync `main` into `develop` (or handle divergence between them), do NOT attempt the operation yourself. Instead, **stop and report** to the caller: list the divergent commits, explain that main and develop have diverged, and recommend the user handle it as an administrative action (see "Handling main/develop Divergence" section below). The agent must never create branches for syncing purposes.
