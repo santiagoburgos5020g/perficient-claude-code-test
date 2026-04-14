@@ -93,16 +93,108 @@ Present these options and ask the user to select one:
 
 ### 3b. Ask for Branch Name
 
-Ask the user: "What name/identifier should the branch have? (e.g., `ASU-188`, `add-dark-mode`, `v2.1.0`)"
+**If the branch type is `release`**, skip this step and go directly to **Step 3c** (Release Version Selection).
+
+**For all other branch types:**
+
+Ask the user: "What name/identifier should the branch have? (e.g., `ASU-188`, `add-dark-mode`)"
 
 **If the user provides a name:** use it.
 
 **If the user does NOT provide a name** (e.g., says "I don't know", "you pick", "whatever", or simply doesn't specify one):
-1. Generate a suggested name based on the context of what the user is trying to accomplish (e.g., `add-user-auth`, `fix-login-crash`, `v1.2.0`)
+1. Generate a suggested name based on the context of what the user is trying to accomplish (e.g., `add-user-auth`, `fix-login-crash`)
 2. Present the suggestion: "I suggest: `{type}/{suggested-name}`. Would you like to use this name, or do you have a different one in mind?"
 3. **Wait for the user to confirm or provide an alternative.** Do not proceed without explicit confirmation.
 
-### 3c. Create the Branch
+### 3c. Release Version Selection & Validation (Release Branches Only)
+
+**If the branch type is `release`, you MUST run this step before creating the branch. No exceptions.**
+
+#### 3c-i. Collect Existing Release Versions
+
+Gather versions from **all four sources** in parallel:
+
+a. **Git tags** (local + remote):
+```bash
+git fetch --tags
+git tag --list 'v*' --sort=-version:refname
+```
+
+b. **Remote release branches:**
+```bash
+git branch -r --list 'origin/release/*' --sort=-version:refname
+```
+
+c. **GitHub releases** (via MCP GitHub `list_releases` tool):
+Use the `mcp__github__list_releases` tool with the repository owner and name to fetch published releases.
+
+d. **GitHub tags** (via MCP GitHub `list_tags` tool):
+Use the `mcp__github__list_tags` tool with the repository owner and name as a cross-reference.
+
+**To determine the repository owner and name**, run:
+```bash
+git remote get-url origin
+```
+Parse the owner and repo from the URL (e.g., `https://github.com/owner/repo.git` → owner: `owner`, repo: `repo`).
+
+#### 3c-ii. Determine the Latest Version
+
+1. **Extract and deduplicate versions** from all sources. Normalize version strings by stripping the `v` prefix and `release/v` prefix (e.g., `v1.0.0` → `1.0.0`, `release/v1.1.0` → `1.1.0`).
+2. **Sort** all collected versions using semantic versioning (MAJOR.MINOR.PATCH) in descending order.
+3. **Identify the latest version** (the highest semver).
+
+#### 3c-iii. Suggest Next Consecutive Versions
+
+**If previous releases exist**, present the user with the next logical version options:
+
+```
+Latest release found: v{latest}
+
+Suggested next versions:
+  1. v{major}.{minor}.{patch+1}  (patch — bug fixes only)
+  2. v{major}.{minor+1}.0        (minor — new features, backward compatible)
+  3. v{major+1}.0.0              (major — breaking changes)
+  4. Custom version               (enter your own)
+
+Which version would you like to create?
+```
+
+**If NO previous releases exist**, tell the user:
+
+```
+No previous releases found. This will be the first release.
+Suggested starting version: v1.0.0
+
+Would you like to use v1.0.0, or enter a custom version?
+```
+
+**Wait for the user to select an option or provide a custom version.** Do not proceed without explicit confirmation.
+
+#### 3c-iv. Validate the Selected Version
+
+Once the user selects or provides a version:
+
+1. **Block duplicates:**
+   - If the version already exists in **any** of the sources collected in 3c-i, **STOP**.
+   - Tell the user: "Release version `v{version}` already exists. Found in: {list sources where it was found}."
+   - Return to 3c-iii to let them pick a different version.
+
+2. **Warn on non-consecutive versions:**
+   - If the user provided a custom version that **skips** versions (e.g., `1.1.0` → `1.5.0` or `1.1.0` → `3.0.0`), **warn**:
+     "The latest release is `v{latest}`. Version `v{proposed}` skips versions. Are you sure?"
+   - **Wait for explicit confirmation** before proceeding. If the user says no, return to 3c-iii.
+
+3. **Display final summary:**
+   ```
+   Release validation:
+   - Latest release: v{latest} (or "none" if first release)
+   - New release:    v{proposed}
+   - Status: ✓ Valid
+   ```
+
+4. The confirmed version becomes the branch name: `release/v{version}`.
+
+### 3d. Create the Branch
 
 1. Determine the correct base branch from the reference table:
    - `feature` → `develop`
@@ -280,3 +372,4 @@ Is that correct?"
 11. **Branch-from-main restriction** — only `hotfix/` and `support/` branches may be created from `main`. Block `feature/`, `bugfix/`, and `release/` from `main`.
 12. **Dual PRs for hotfix and release** — `hotfix/` and `release/` branches always require TWO PRs: one to `main` and one to `develop` (or to the active `release/*` branch in the hotfix exception case)
 13. **Bugfix source tracking** — `bugfix/` branches merge back to the branch they were created from (`develop` or the specific `release/*` branch), never to `main`
+14. **Release version validation** — before creating any `release/` branch, collect existing versions from git tags, remote release branches, GitHub releases, and GitHub tags (via MCP). Block duplicates, suggest next consecutive versions (patch/minor/major), and warn on non-consecutive jumps. Never create a release branch without completing this validation.
