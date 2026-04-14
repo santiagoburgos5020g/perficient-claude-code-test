@@ -2,6 +2,9 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ProductCard from './ProductCard';
 import type { Product } from '@/features/products/types/product';
 
+
+// test
+
 jest.mock('next/image', () => ({
   __esModule: true,
   default: (props: any) => <img {...props} />,

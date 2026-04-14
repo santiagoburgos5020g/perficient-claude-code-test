@@ -18,7 +18,9 @@ This project enforces Git Flow via the **`agent-git-flow-enforcer`** subagent, w
 - **Validates** branch naming, commit prefixes, and merge targets.
 - **Manages** pushes and pull requests according to Git Flow rules.
 
-The agent must be launched **proactively** via the Agent tool before any git operations (commit, push, branch creation, merge). Do not skip this step — always invoke the agent before performing git workflow actions.
+The agent must be launched **proactively** via the Agent tool (with `subagent_type: "agent-git-flow-enforcer"`) before any git operations (commit, push, branch creation, merge). Do not skip this step — always invoke the agent before performing git workflow actions.
+
+**Important:** Do NOT run manual git commands (e.g., `git status`, `git diff`, `git log`) before or instead of launching the agent. The agent handles all git commands internally as part of its workflow. When a git operation is needed, go directly to the Agent tool — no preliminary Bash git commands.
 
 ## Agents
 
