@@ -11,7 +11,9 @@ For database-related operations, reference the Prisma schema at `prisma/schema.p
 
 ## Git Flow Enforcement
 
-This project enforces Git Flow via the **`agent-git-flow-enforcer`** subagent, which handles the entire Git Flow process:
+Git Flow enforcement is controlled by the **`AGENT_GIT_FLOW_ENABLED`** environment variable in `.claude/settings.json`. It defaults to `"false"` (disabled). Set it to `"true"` to enable enforcement.
+
+When enabled, this project enforces Git Flow via the **`agent-git-flow-enforcer`** subagent, which handles the entire Git Flow process:
 
 - **Blocks** direct commits, pushes, and staging on protected branches (`main`, `develop`).
 - **Creates** feature, release, and hotfix branches following Git Flow conventions.

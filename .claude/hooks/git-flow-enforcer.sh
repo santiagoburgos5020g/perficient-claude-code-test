@@ -3,6 +3,11 @@
 # Reads hook input JSON from stdin, validates git commands against Git Flow rules.
 # Uses Node.js for JSON parsing (jq not available on this system).
 
+# If AGENT_GIT_FLOW_ENABLED is not "true", skip all enforcement
+if [ "$AGENT_GIT_FLOW_ENABLED" != "true" ]; then
+  exit 0
+fi
+
 INPUT=$(cat)
 
 # Extract the command from the hook input JSON using node
