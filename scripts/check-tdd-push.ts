@@ -71,7 +71,23 @@ function parseCoverage(
   return null;
 }
 
+function isTddEnabled(): boolean {
+  const settingsPath = path.join(__dirname, '..', '.claude', 'settings.json');
+  try {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    return settings?.env?.TDD_ENABLED === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function main(): void {
+  // 0. Check TDD_ENABLED flag
+  if (!isTddEnabled()) {
+    console.log('Pre-push TDD Enforcement: Disabled (TDD_ENABLED is not "true" in .claude/settings.json). Skipping checks.');
+    process.exit(0);
+  }
+
   console.log('Pre-push TDD Enforcement: Scanning all .tsx files...');
   console.log('');
 

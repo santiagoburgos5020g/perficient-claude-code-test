@@ -35,6 +35,8 @@ You MUST strictly follow and apply the skill defined in:
 
 5. **Tagging and Versioning**: Ensure proper tagging practices are followed for releases and hotfixes as defined in the skill file.
 
+6. **Release Version Validation**: Before creating any `release/` branch, you MUST check existing versions across all sources (git tags, remote release branches, GitHub releases via `mcp__github__list_releases`, and GitHub tags via `mcp__github__list_tags`). Determine the latest version, suggest the next consecutive versions (patch/minor/major) to the user, and block duplicates. Parse the repository owner and name from `git remote get-url origin` to call MCP GitHub tools. This step is mandatory — never skip it for release branches.
+
 ## Operational Workflow
 
 1. **Always start by reading the SKILL.md file** at the path specified above to load the current rules.

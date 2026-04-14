@@ -22,6 +22,15 @@ The agent must be launched **proactively** via the Agent tool (with `subagent_ty
 
 **Important:** Do NOT run manual git commands (e.g., `git status`, `git diff`, `git log`) before or instead of launching the agent. The agent handles all git commands internally as part of its workflow. When a git operation is needed, go directly to the Agent tool — no preliminary Bash git commands.
 
+## MCP GitHub Server
+
+For troubleshooting the GitHub MCP server (e.g., 403 errors when creating PRs), see the [MCP GitHub Token reference](/.claude/memory/reference_mcp_github_token.md). Key points:
+
+- Token is set in `.claude/settings.local.json` under `env.GITHUB_PERSONAL_ACCESS_TOKEN`.
+- `.mcp.json` references it via `${GITHUB_PERSONAL_ACCESS_TOKEN}`.
+- Classic tokens need the **`repo`** scope for PR creation.
+- **Restart Claude Code** after updating the token.
+
 ## Agents
 
 The `.claude/agents/` folder already exists. When adding new agents, place them inside `.claude/agents/`.
