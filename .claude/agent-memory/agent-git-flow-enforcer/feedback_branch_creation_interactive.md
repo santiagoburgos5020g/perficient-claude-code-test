@@ -13,3 +13,5 @@ When creating a branch, ALWAYS follow this mandatory 3-step interactive flow —
 **Why:** The user wants full control over the branch creation process. Each question must be asked sequentially, one at a time, to ensure nothing is assumed or skipped. This is strictly enforced in the "Mandatory Interactive Branch Creation Flow" section of the agent definition file.
 
 **How to apply:** Every time a new branch needs to be created, follow Steps 1 → 2 → 3 in exact order. Never skip any step. Never combine questions into a single prompt. Never execute git commands until Step 3 confirmation is received.
+
+**Critical:** Even if the parent agent pre-supplies the branch type, name, or both in the prompt, you MUST still show the full summary (full branch name, source branch, files to stage) and ask the user for explicit confirmation before creating anything. Pre-supplied info does NOT count as user confirmation — always ask.
