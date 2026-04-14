@@ -28,63 +28,27 @@ The agent must be launched **proactively** via the Agent tool (with `subagent_ty
 
 The `agent-git-flow-enforcer` is trusted to handle the full Git Flow process. Do **not** verify the agent's work after it completes — relay its results directly to the user without running additional git commands to double-check branch names, commit locations, or PR targets.
 
-## MCP GitHub Server
+## GitHub Integration
 
-This project uses the GitHub MCP server via **stdio transport** with a Personal Access Token (PAT), configured at the project level.
+This project uses the **GitHub CLI (`gh`)** for all GitHub operations (PRs, issues, branches, etc.) instead of the MCP GitHub server.
 
-### Configuration (two files)
+### Setup
 
-1. **`.mcp.json`** (project root) — defines the server:
+1. Install GitHub CLI: https://cli.github.com/
+2. Authenticate: `gh auth login --with-token` using a PAT, or `gh auth login` for interactive login.
 
-```json
-{
-  "mcpServers": {
-    "github": {
-      "type": "stdio",
-      "command": "cmd",
-      "args": ["/c", "npx", "-y", "@github/mcp-server"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-      }
-    }
-  }
-}
-```
+### Usage
 
-2. **`.claude/settings.local.json`** — provides the token (not committed to git):
+Use `gh` commands via the Bash tool for all GitHub tasks:
 
-```json
-{
-  "env": {
-    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_YOUR_TOKEN_HERE"
-  }
-}
-```
+- **Pull requests:** `gh pr create`, `gh pr list`, `gh pr view`, `gh pr merge`
+- **Issues:** `gh issue create`, `gh issue list`, `gh issue view`
+- **Branches:** `gh api repos/{owner}/{repo}/branches`
+- **PR comments:** `gh api repos/{owner}/{repo}/pulls/{number}/comments`
 
-### Token requirements
+### Token
 
-- Must be a **Classic** token (not fine-grained).
-- Needs the **`repo`** scope for PR creation and branch operations.
-- Generate at: GitHub > Settings > Developer settings > Personal access tokens > Tokens (classic).
-
-### Marketplace plugin conflict
-
-Claude Code's marketplace GitHub plugin (`~/.claude/plugins/.../github/.mcp.json`) uses HTTP/OAuth transport (`api.githubcopilot.com`) and **overrides** the project-level stdio config. To use the project-level PAT config, disable the marketplace plugin:
-
-```bash
-mv "$HOME/.claude/plugins/marketplaces/claude-plugins-official/external_plugins/github/.mcp.json" \
-   "$HOME/.claude/plugins/marketplaces/claude-plugins-official/external_plugins/github/.mcp.json.disabled"
-```
-
-To re-enable later, rename it back to `.mcp.json`.
-
-### After any config change
-
-**Restart Claude Code** so the MCP server reconnects with the updated config.
-
-### Troubleshooting
-
-For additional troubleshooting (e.g., 403 errors), see the [MCP GitHub Token reference](/.claude/memory/reference_mcp_github_token.md).
+The PAT is stored in `.claude/settings.local.json` under `env.GITHUB_PERSONAL_ACCESS_TOKEN` and is used by `gh` via `gh auth login --with-token`. The token requires the **`repo`** scope at minimum.
 
 ## Agents
 
