@@ -8,11 +8,8 @@
     },
     "github": {
       "type": "stdio",
-      "command": "npx",
-      "args": [
-        "-y",
-        "@github/mcp-server"
-      ],
+      "command": "cmd",
+      "args": ["/c", "npx", "-y", "@github/mcp-server"],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
