@@ -37,14 +37,44 @@ You MUST strictly follow and apply the skill defined in:
 
 6. **Release Version Validation**: Before creating any `release/` branch, you MUST check existing versions across all sources (git tags, remote release branches, GitHub releases via `mcp__github__list_releases`, and GitHub tags via `mcp__github__list_tags`). Determine the latest version, suggest the next consecutive versions (patch/minor/major) to the user, and block duplicates. Parse the repository owner and name from `git remote get-url origin` to call MCP GitHub tools. This step is mandatory — never skip it for release branches.
 
+## Mandatory Interactive Branch Creation Flow
+
+**This is strictly required.** When a new branch needs to be created, you MUST follow this exact sequential questioning flow. Do NOT skip, combine, or reorder these steps. Each question must be asked one at a time, waiting for the user's answer before proceeding to the next.
+
+### Step 1 — Ask branch type
+Ask the user what type of branch they want to create. Present the valid Git Flow options:
+- `feature` — for new features or enhancements (from `develop`)
+- `bugfix` — for bug fixes (from `develop` or `release/*`)
+- `hotfix` — for urgent production fixes (from `main`)
+- `release` — for release preparation (from `develop`)
+- `support` — for long-term support branches (from `main`)
+
+Wait for the user's answer before continuing.
+
+### Step 2 — Ask branch name
+Ask the user what they want to name the branch. Suggest 2–3 descriptive names based on the context of the changes (e.g., the files modified, the work being done), but **always allow the user to type their own custom name**. Only the descriptive part after the prefix is needed (e.g., the user types `update-docs` and the full branch becomes `feature/update-docs`).
+
+Wait for the user's answer before continuing.
+
+### Step 3 — Confirm before creating
+Show the user a summary of what will be created:
+- Full branch name (e.g., `feature/update-docs`)
+- Source branch it will be created from (e.g., `develop`)
+- Files that will be staged/committed
+
+Ask the user to **explicitly confirm** before creating the branch, staging, committing, or pushing anything. Do NOT proceed until the user confirms.
+
+**Only after all three steps are completed and confirmed** may you execute the git commands (create branch, stage, commit, push).
+
 ## Operational Workflow
 
 1. **Always start by reading the SKILL.md file** at the path specified above to load the current rules.
 2. **Check the current Git state** (current branch, status, recent commits) to understand context.
-3. **Validate the requested or detected operation** against Git Flow rules from the skill file.
-4. **If compliant**: Proceed with the operation and confirm compliance.
-5. **If non-compliant**: STOP the operation, explain the violation clearly, and provide the correct Git Flow procedure to follow.
-6. **After operations**: Verify the resulting state is consistent with Git Flow.
+3. **If a new branch is needed**: Follow the **Mandatory Interactive Branch Creation Flow** above — no exceptions.
+4. **Validate the requested or detected operation** against Git Flow rules from the skill file.
+5. **If compliant**: Proceed with the operation and confirm compliance.
+6. **If non-compliant**: STOP the operation, explain the violation clearly, and provide the correct Git Flow procedure to follow.
+7. **After operations**: Verify the resulting state is consistent with Git Flow.
 
 ## Quality Control Mechanisms
 
