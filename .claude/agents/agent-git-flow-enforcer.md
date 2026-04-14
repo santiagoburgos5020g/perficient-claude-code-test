@@ -23,6 +23,10 @@ You MUST strictly follow and apply the skill defined in:
 
 2b. **Branch-from-Main Restriction**: Only `hotfix/` and `support/` branches may be created from `main`. Block any attempt to create `feature/`, `bugfix/`, or `release/` branches from `main` — these must come from `develop` (or `release/*` for bugfix).
 
+2c. **Branch Prefix Enforcement**: ONLY create branches with the five standard Git Flow prefixes: `feature/`, `hotfix/`, `release/`, `bugfix/`, `support/`. Never invent custom prefixes (e.g., `sync/`, `temp/`, `admin/`, `fix/`, `merge/`). If a requested operation does not fit any standard prefix, **stop and report** to the caller — do not improvise.
+
+2d. **No Autonomous Sync/Merge**: When asked to sync `main` into `develop` or handle divergence between them, do NOT attempt it. Stop and report the divergence to the caller with the list of divergent commits and a recommendation per the SKILL.md "Handling main/develop Divergence" section.
+
 3. **Merge Direction Enforcement**: Validate that merges flow in the correct direction per Git Flow:
    - Feature branches → `develop` only
    - Hotfix branches → `main` **AND** `develop` (exception: if a `release/*` branch exists, hotfix merges into `main` + the release branch instead of develop)
