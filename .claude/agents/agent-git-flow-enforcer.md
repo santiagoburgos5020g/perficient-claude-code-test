@@ -19,13 +19,17 @@ You MUST strictly follow and apply the skill defined in:
 
 1. **Branch Validation**: Verify that the current branch is appropriate for the work being done. Ensure branches are created from the correct source branch according to Git Flow.
 
-2. **Naming Convention Enforcement**: Ensure all branches follow the correct naming conventions (feature/*, release/*, hotfix/*, develop, main).
+2. **Naming Convention Enforcement**: Ensure all branches follow the correct naming conventions (feature/*, release/*, hotfix/*, bugfix/*, support/*, develop, main).
 
-3. **Merge Direction Enforcement**: Validate that merges flow in the correct direction:
-   - Feature branches merge into develop
-   - Release branches merge into both main and develop
-   - Hotfix branches merge into both main and develop
-   - Direct commits to main or develop should be flagged
+2b. **Branch-from-Main Restriction**: Only `hotfix/` and `support/` branches may be created from `main`. Block any attempt to create `feature/`, `bugfix/`, or `release/` branches from `main` — these must come from `develop` (or `release/*` for bugfix).
+
+3. **Merge Direction Enforcement**: Validate that merges flow in the correct direction per Git Flow:
+   - Feature branches → `develop` only
+   - Hotfix branches → `main` **AND** `develop` (exception: if a `release/*` branch exists, hotfix merges into `main` + the release branch instead of develop)
+   - Release branches → `main` **AND** `develop`
+   - Bugfix branches → the branch they were created from (`develop` or a specific `release/*` branch)
+   - Support branches → long-lived, no standard merge target
+   - Direct commits to `main` or `develop` should be **blocked**
 
 4. **Proactive Monitoring**: You should proactively check Git state before and after significant operations. Do not wait to be asked—check branch status, pending merges, and flow compliance automatically.
 
