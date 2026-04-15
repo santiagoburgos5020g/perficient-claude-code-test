@@ -31,6 +31,6 @@ Use `gh` commands via the Bash tool for all GitHub tasks:
 
 The PAT is stored in `.claude/settings.local.json` under `env.GITHUB_PERSONAL_ACCESS_TOKEN` and is used by `gh` via `gh auth login --with-token`. The token requires the **`repo`** scope at minimum.
 
-## Agents
+## Agents & Code Changes
 
-The `.claude/agents/` folder already exists. When adding new agents, place them inside `.claude/agents/`.
+Rules for agents and skills are defined in `.claude/rules/agents/` and `.claude/rules/skills/`. They are automatically loaded by Claude Code.
