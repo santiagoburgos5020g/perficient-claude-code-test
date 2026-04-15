@@ -5,6 +5,10 @@ description: >
   TRIGGER when: user invokes /delegate-code. Handles code changes, refactors, bug fixes,
   and new features by routing to the correct subagent, getting a plan, showing it for
   user confirmation, then executing.
+when_to_use: >
+  Only when the user explicitly types /delegate-code in the prompt. This skill is
+  user-invoked only — Claude must never auto-trigger it. If the user asks for a code
+  change without /delegate-code, handle it normally or ask if they want to delegate.
 disable-model-invocation: true
 user-invocable: true
 argument-hint: [code request description]
