@@ -1,7 +1,7 @@
 ---
 name: solid-principles-reference
 description: Strict SOLID principles reference — agents consult this during code creation, modification, and review to enforce correct principle adherence across all languages
-user-invocable: false
+user-invocable: true
 ---
 
 # SOLID Principles Reference

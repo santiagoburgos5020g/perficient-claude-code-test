@@ -1,7 +1,7 @@
 ---
 name: backend-best-practices
 description: Strict backend best practices reference — agents consult this during API route, database, and backend code creation, modification, and review to enforce security, REST conventions, Zod validation, Prisma optimization, and testing standards
-user-invocable: false
+user-invocable: true
 ---
 
 # Backend Best Practices Reference

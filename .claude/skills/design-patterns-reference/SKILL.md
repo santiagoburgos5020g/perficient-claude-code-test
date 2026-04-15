@@ -1,7 +1,7 @@
 ---
 name: design-patterns-reference
 description: Strict GoF design patterns reference — agents consult this during code creation, modification, and review to enforce correct pattern usage across all languages
-user-invocable: false
+user-invocable: true
 ---
 
 # Design Patterns Reference

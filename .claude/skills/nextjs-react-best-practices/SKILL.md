@@ -1,7 +1,7 @@
 ---
 name: nextjs-react-best-practices
 description: Strict Next.js 14 (Pages Router), React 18, and TypeScript 5 best practices reference — agents consult this during code creation, modification, and review to enforce correct frontend patterns including Container-Presentational, useSWR, Tailwind CSS, accessibility, and performance
-user-invocable: false
+user-invocable: true
 ---
 
 # Next.js 14 / React 18 / TypeScript 5 Best Practices Reference
