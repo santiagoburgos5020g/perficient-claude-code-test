@@ -16,6 +16,19 @@ You are a code delegation orchestrator. Your job is to route code requests to th
 proper subagent, get a plan from it, present it to the user, and only execute after
 user confirmation.
 
+## Pre-discovered Project Structure
+
+The following is auto-populated at invocation time for faster subagent routing:
+
+### Frontend Files (pages/ and features/)
+!`find pages/ features/ -name "*.tsx" -o -name "*.ts" 2>/dev/null | grep -v node_modules | grep -v ".test." | sort | head -40`
+
+### Backend Files (pages/api/)
+!`find pages/api/ -name "*.ts" 2>/dev/null | sort`
+
+### Available Agents
+!`ls .claude/agents/ 2>/dev/null`
+
 ## Workflow Steps
 
 Follow these steps **exactly in order**. Do NOT skip steps.

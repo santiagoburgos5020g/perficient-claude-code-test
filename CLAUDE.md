@@ -31,6 +31,19 @@ Use `gh` commands via the Bash tool for all GitHub tasks:
 
 The PAT is stored in `.claude/settings.local.json` under `env.GITHUB_PERSONAL_ACCESS_TOKEN` and is used by `gh` via `gh auth login --with-token`. The token requires the **`repo`** scope at minimum.
 
+## Code Reviews & Refactoring
+
+All code reviews, audits, and refactor assessments MUST be measured against the project's own skills — never generic. See:
+
+- `.claude/rules/review-must-use-skills.md` — Enforces skill-based reviews with required steps
+- `.claude/rules/refactoring-order.md` — Combined priority order across all skills
+
+The applicable skills are:
+- `.claude/skills/nextjs-react-best-practices/` — Frontend (13 categories)
+- `.claude/skills/solid-principles-reference/` — SOLID principles (5 principles)
+- `.claude/skills/design-patterns-reference/` — GoF design patterns
+- `.claude/skills/backend-best-practices/` — Backend (15 rules, tiered enforcement)
+
 ## Agents & Code Changes
 
 Rules for agents and skills are defined in `.claude/rules/agents/` and `.claude/rules/skills/`. They are automatically loaded by Claude Code.

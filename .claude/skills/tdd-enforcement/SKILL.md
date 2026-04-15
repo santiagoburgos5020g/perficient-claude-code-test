@@ -3,6 +3,7 @@ name: tdd-enforcement
 description: >
   Enforce Test-Driven Development for React components and pages. TRIGGER ONLY when the environment variable TDD_ENABLED is set to "true" in settings.json (check env.TDD_ENABLED). If TDD_ENABLED is "false" or not set, do NOT trigger this skill — skip it silently. When enabled, trigger when: creating or modifying .tsx files in features/**/components/** or pages/**, user asks to create a component or page, user asks to add a feature that involves components or pages, or user asks about TDD workflow. Ensures tests are written BEFORE component/page code, with 100% coverage using Jest + React Testing Library.
 argument-hint: [component-or-page-name]
+effort: high
 allowed-tools: Read Grep Glob Bash(npx jest:*) Bash(npm test:*) Bash(npm run test:*)
 paths: "features/**/components/**/*.tsx,pages/**/*.tsx"
 ---

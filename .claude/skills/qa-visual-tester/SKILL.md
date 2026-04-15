@@ -2,12 +2,23 @@
 name: qa-visual-tester
 description: Opens browser and QA-tests all pages using chrome-devtools — verifies rendering, spinners, infinite scroll, forms, navigation across desktop/tablet/mobile viewports
 disable-model-invocation: true
+effort: high
 allowed-tools: Bash, Read, Write, Glob, Grep, Edit, mcp__chrome-devtools__navigate_page, mcp__chrome-devtools__take_screenshot, mcp__chrome-devtools__take_snapshot, mcp__chrome-devtools__click, mcp__chrome-devtools__fill, mcp__chrome-devtools__press_key, mcp__chrome-devtools__evaluate_script, mcp__chrome-devtools__list_pages, mcp__chrome-devtools__close_page
 ---
 
 # QA Visual Tester
 
 Automated QA testing skill that behaves like a real end-user — starts the dev server, opens the browser via MCP chrome-devtools, navigates every page, and verifies rendering, interactions, and responsiveness across desktop, tablet, and mobile viewports.
+
+## Pre-discovered Context
+
+The following is auto-populated at invocation time for faster startup:
+
+### Available Page Routes
+!`ls pages/*.tsx 2>/dev/null | grep -v '_app\|_document\|_error' | sed 's|pages/||;s|\.tsx$||;s|^index$|/|'`
+
+### Test Files
+!`find . -name "*.test.tsx" -not -path "*/node_modules/*" 2>/dev/null | sort`
 
 ## Time Tracking
 

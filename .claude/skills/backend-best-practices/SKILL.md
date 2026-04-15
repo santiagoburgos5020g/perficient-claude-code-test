@@ -1,6 +1,8 @@
 ---
 name: backend-best-practices
 description: Strict backend best practices reference — agents consult this during API route, database, and backend code creation, modification, and review to enforce security, REST conventions, Zod validation, Prisma optimization, and testing standards
+when_to_use: "TRIGGER when: creating or modifying API routes in pages/api/; writing Prisma queries or database operations; adding Zod validation schemas; reviewing backend error handling or security; adding environment variables or authentication. SKIP when: frontend-only work (components, hooks, styles)"
+effort: high
 user-invocable: true
 ---
 

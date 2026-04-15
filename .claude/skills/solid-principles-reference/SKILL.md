@@ -1,6 +1,8 @@
 ---
 name: solid-principles-reference
 description: Strict SOLID principles reference — agents consult this during code creation, modification, and review to enforce correct principle adherence across all languages
+when_to_use: "TRIGGER when: class has multiple responsibilities; growing if/else chains for behavior; subclass overrides break parent contract; interface forces unused method implementations; high-level code imports low-level details; reviewing OOP design. SKIP when: code is trivially simple with no structural issues"
+effort: high
 user-invocable: true
 ---
 
