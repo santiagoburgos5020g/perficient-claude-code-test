@@ -183,6 +183,16 @@ if (( NUM_COMMENTS > 0 )); then
       echo "Review with inline comments posted successfully."
     else
       echo "::warning::Failed to post review with inline comments (path/line mismatch)."
+
+      # The failed attempt may have left a PENDING review — delete it before fallback
+      echo "Cleaning up any PENDING reviews before fallback..."
+      REVIEWS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
+      echo "$REVIEWS" | jq -c '.[] | select(.user.login == "github-actions[bot]" and .state == "PENDING")' 2>/dev/null | while IFS= read -r r; do
+        rid=$(echo "$r" | jq -r '.id')
+        echo "  Deleting PENDING review #${rid}..."
+        gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${rid}" --method DELETE 2>/dev/null || true
+      done
+
       echo "Falling back: posting review body only, with violations in summary..."
 
       # Append inline comment details to the summary body as a fallback

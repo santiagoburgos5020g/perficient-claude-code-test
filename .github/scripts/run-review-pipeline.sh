@@ -447,6 +447,37 @@ fi
 
 echo "Raw CLI output (first 500 chars):"
 head -c 500 pipeline-output.json
+echo ""
+
+# ---------------------------------------------------------------------------
+# 3a. Log token usage and duration from the CLI envelope
+# ---------------------------------------------------------------------------
+if jq -e '.type' pipeline-output.json >/dev/null 2>&1; then
+  DURATION_MS=$(jq -r '.duration_ms // "N/A"' pipeline-output.json)
+  DURATION_API_MS=$(jq -r '.duration_api_ms // "N/A"' pipeline-output.json)
+  NUM_TURNS=$(jq -r '.num_turns // "N/A"' pipeline-output.json)
+  # Token usage fields (if present in the envelope)
+  INPUT_TOKENS=$(jq -r '.usage.input_tokens // .input_tokens // "N/A"' pipeline-output.json)
+  OUTPUT_TOKENS=$(jq -r '.usage.output_tokens // .output_tokens // "N/A"' pipeline-output.json)
+  TOTAL_TOKENS=$(jq -r '.usage.total_tokens // .total_tokens // "N/A"' pipeline-output.json)
+  CACHE_READ=$(jq -r '.usage.cache_read_input_tokens // .cache_read_input_tokens // "N/A"' pipeline-output.json)
+  CACHE_CREATION=$(jq -r '.usage.cache_creation_input_tokens // .cache_creation_input_tokens // "N/A"' pipeline-output.json)
+
+  echo ""
+  echo "=============================="
+  echo "  Pipeline Usage Stats"
+  echo "=============================="
+  echo "  Duration (total):  ${DURATION_MS} ms"
+  echo "  Duration (API):    ${DURATION_API_MS} ms"
+  echo "  Turns:             ${NUM_TURNS}"
+  echo "  Input tokens:      ${INPUT_TOKENS}"
+  echo "  Output tokens:     ${OUTPUT_TOKENS}"
+  echo "  Total tokens:      ${TOTAL_TOKENS}"
+  echo "  Cache read:        ${CACHE_READ}"
+  echo "  Cache creation:    ${CACHE_CREATION}"
+  echo "=============================="
+  echo ""
+fi
 
 # The Claude CLI with --output-format json wraps the response in an envelope:
 #   {"type":"result","result":"<model output as string>",...}
