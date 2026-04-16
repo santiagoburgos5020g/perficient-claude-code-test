@@ -4,7 +4,7 @@ import type { Product } from '@/features/products/types/product';
 import { formatPrice } from '@/features/products/utils/formatPrice';
 
 interface ProductCardProps {
-  product: Product | null;
+  product: Product;
 }
 
 export default function ProductCard({ product }: ProductCardProps) {
