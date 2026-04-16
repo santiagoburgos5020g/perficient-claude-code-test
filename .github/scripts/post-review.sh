@@ -176,6 +176,11 @@ if (( NUM_COMMENTS > 0 )); then
         comments: $comments
       }')
 
+    # Count existing reviews from the bot BEFORE posting, so we can detect
+    # if the failed API call still created a review (422 can be partial).
+    REVIEWS_BEFORE=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
+    BOT_REVIEW_COUNT_BEFORE=$(echo "$REVIEWS_BEFORE" | jq '[.[] | select(.user.login == "github-actions[bot]")] | length')
+
     echo "Posting review with ${FILTERED_COUNT} inline comments..."
     if echo "$PAYLOAD" | gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
         --method POST \
@@ -184,29 +189,37 @@ if (( NUM_COMMENTS > 0 )); then
     else
       echo "::warning::Failed to post review with inline comments (path/line mismatch)."
 
-      # The failed attempt may have left a PENDING review — delete it before fallback
-      echo "Cleaning up any PENDING reviews before fallback..."
-      REVIEWS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
-      echo "$REVIEWS" | jq -c '.[] | select(.user.login == "github-actions[bot]" and .state == "PENDING")' 2>/dev/null | while IFS= read -r r; do
-        rid=$(echo "$r" | jq -r '.id')
-        echo "  Deleting PENDING review #${rid}..."
-        gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${rid}" --method DELETE 2>/dev/null || true
-      done
+      # Check if the failed API call still created a review (422 partial creation)
+      REVIEWS_AFTER=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
+      BOT_REVIEW_COUNT_AFTER=$(echo "$REVIEWS_AFTER" | jq '[.[] | select(.user.login == "github-actions[bot]")] | length')
 
-      echo "Falling back: posting review body only, with violations in summary..."
+      if (( BOT_REVIEW_COUNT_AFTER > BOT_REVIEW_COUNT_BEFORE )); then
+        echo "The API created the review despite the 422 error (without inline comments)."
+        echo "Skipping fallback to avoid duplicate review."
+      else
+        # No review was created — clean up any PENDING leftovers and post fallback
+        echo "No review was created. Cleaning up any PENDING reviews..."
+        echo "$REVIEWS_AFTER" | jq -c '.[] | select(.user.login == "github-actions[bot]" and .state == "PENDING")' 2>/dev/null | while IFS= read -r r; do
+          rid=$(echo "$r" | jq -r '.id')
+          echo "  Deleting PENDING review #${rid}..."
+          gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${rid}" --method DELETE 2>/dev/null || true
+        done
 
-      # Append inline comment details to the summary body as a fallback
-      COMMENT_DETAILS=$(echo "$FILTERED_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)** — \(.body | split("\n") | .[0])"')
-      FALLBACK_BODY="${SUMMARY}
+        echo "Falling back: posting review body only, with violations in summary..."
+
+        # Append inline comment details to the summary body as a fallback
+        COMMENT_DETAILS=$(echo "$FILTERED_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)** — \(.body | split("\n") | .[0])"')
+        FALLBACK_BODY="${SUMMARY}
 
 ### Inline comments (could not attach to diff lines)
 ${COMMENT_DETAILS}"
 
-      retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-        --method POST \
-        --field event="$EVENT" \
-        --field body="$FALLBACK_BODY" \
-        --field commit_id="$COMMIT_ID"
+        retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+          --method POST \
+          --field event="$EVENT" \
+          --field body="$FALLBACK_BODY" \
+          --field commit_id="$COMMIT_ID"
+      fi
     fi
   else
     # All comments filtered out — post review body only
