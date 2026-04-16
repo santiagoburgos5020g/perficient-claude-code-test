@@ -1,4 +1,4 @@
-import type { Album } from '@/features/albums/types/album';
+import type { Album } from '@/types/album';
 
 interface AlbumListProps {
   albums: Album[];

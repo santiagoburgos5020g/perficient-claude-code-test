@@ -1,5 +1,5 @@
 import useSWR, { type KeyedMutator } from 'swr';
-import type { Album } from '@/features/albums/types/album';
+import type { Album } from '@/types/album';
 
 interface UseAlbumsReturn {
   albums: Album[];

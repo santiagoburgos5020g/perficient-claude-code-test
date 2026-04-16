@@ -1,5 +1,6 @@
-import { useAlbums } from '@/features/albums/hooks/useAlbums';
-import AlbumList from '@/features/albums/components/AlbumList';
+import { useAlbums } from '@/hooks/useAlbums';
+import AlbumList from '@/components/AlbumList/AlbumList';
+import ErrorBoundary from '@/components/ErrorBoundary/ErrorBoundary';
 
 export default function AlbumsPage() {
   const { albums, isLoading, error } = useAlbums();
@@ -16,7 +17,11 @@ export default function AlbumsPage() {
         <p className="text-red-600" role="alert">Error: {error}</p>
       )}
 
-      {!isLoading && !error && <AlbumList albums={albums} />}
+      {!isLoading && !error && (
+        <ErrorBoundary fallback={<p className="text-red-600" role="alert">Something went wrong displaying albums.</p>}>
+          <AlbumList albums={albums} />
+        </ErrorBoundary>
+      )}
     </main>
   );
 }
