@@ -120,33 +120,93 @@ case "$VERDICT" in
 esac
 
 # ---------------------------------------------------------------------------
-# 4. Post the bundled review
+# 4. Filter inline comments to only lines present in the PR diff
 # ---------------------------------------------------------------------------
 COMMIT_ID=$(git rev-parse HEAD)
 
 if (( NUM_COMMENTS > 0 )); then
-  # Build the full review payload with inline comments
-  PAYLOAD=$(jq -n \
-    --arg event "$EVENT" \
-    --arg body "$SUMMARY" \
-    --arg commit_id "$COMMIT_ID" \
-    --argjson comments "$(jq '[.inline_comments[] | {
+  echo "Filtering inline comments against PR diff..."
+
+  # Get the diff to know which files/lines are valid for inline comments
+  DIFF_OUTPUT=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.diff_url' 2>/dev/null || true)
+
+  # Get the list of files in the PR with their patch data
+  PR_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate 2>/dev/null || echo "[]")
+
+  # Build a lookup of valid file paths in the PR
+  VALID_PATHS=$(echo "$PR_FILES" | jq -r '.[].filename' 2>/dev/null || true)
+
+  # Filter comments: keep only those whose path exists in the PR files
+  # For each comment, verify the path is in the diff. We can't easily validate
+  # exact line numbers without parsing patches, so we filter by path and keep
+  # lines as-is (GitHub will reject invalid lines per-comment).
+  FILTERED_COMMENTS=$(jq --argjson pr_files "$PR_FILES" '[
+    .inline_comments[] |
+    . as $comment |
+    # Check if the path exists in PR files
+    select(
+      ($pr_files | map(.filename) | index($comment.path)) != null
+    ) |
+    {
       path: .path,
       line: (.line // 1),
       side: (.side // "RIGHT"),
       body: .body
-    }]' "$OUTPUT_FILE")" \
-    '{
-      event: $event,
-      body: $body,
-      commit_id: $commit_id,
-      comments: $comments
-    }')
+    }
+  ]' "$OUTPUT_FILE")
 
-  echo "Posting review with ${NUM_COMMENTS} inline comments..."
-  echo "$PAYLOAD" | retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
-    --method POST \
-    --input -
+  FILTERED_COUNT=$(echo "$FILTERED_COMMENTS" | jq 'length')
+  echo "Filtered: ${FILTERED_COUNT} of ${NUM_COMMENTS} comments have valid paths"
+
+  # ---------------------------------------------------------------------------
+  # 5. Post the bundled review
+  # ---------------------------------------------------------------------------
+
+  if (( FILTERED_COUNT > 0 )); then
+    # Try posting with inline comments
+    PAYLOAD=$(jq -n \
+      --arg event "$EVENT" \
+      --arg body "$SUMMARY" \
+      --arg commit_id "$COMMIT_ID" \
+      --argjson comments "$FILTERED_COMMENTS" \
+      '{
+        event: $event,
+        body: $body,
+        commit_id: $commit_id,
+        comments: $comments
+      }')
+
+    echo "Posting review with ${FILTERED_COUNT} inline comments..."
+    if echo "$PAYLOAD" | gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+        --method POST \
+        --input - 2>/dev/null; then
+      echo "Review with inline comments posted successfully."
+    else
+      echo "::warning::Failed to post review with inline comments (path/line mismatch)."
+      echo "Falling back: posting review body only, with violations in summary..."
+
+      # Append inline comment details to the summary body as a fallback
+      COMMENT_DETAILS=$(echo "$FILTERED_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)** — \(.body | split("\n") | .[0])"')
+      FALLBACK_BODY="${SUMMARY}
+
+### Inline comments (could not attach to diff lines)
+${COMMENT_DETAILS}"
+
+      retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+        --method POST \
+        --field event="$EVENT" \
+        --field body="$FALLBACK_BODY" \
+        --field commit_id="$COMMIT_ID"
+    fi
+  else
+    # All comments filtered out — post review body only
+    echo "No comments matched PR diff paths. Posting review body only..."
+    retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
+      --method POST \
+      --field event="$EVENT" \
+      --field body="$SUMMARY" \
+      --field commit_id="$COMMIT_ID"
+  fi
 else
   # Review without inline comments (pass/skip)
   echo "Posting review (no inline comments)..."
