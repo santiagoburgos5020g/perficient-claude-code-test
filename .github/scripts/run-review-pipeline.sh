@@ -438,16 +438,88 @@ Now execute Stage 1. Begin by running: git diff --name-only origin/main...HEAD
 PIPELINE_PROMPT
 
 # ---------------------------------------------------------------------------
-# 3. Validate output
+# 3. Extract and validate output
 # ---------------------------------------------------------------------------
 if [ ! -f pipeline-output.json ]; then
   echo "::error::Pipeline did not produce output file"
   exit 1
 fi
 
+echo "Raw CLI output (first 500 chars):"
+head -c 500 pipeline-output.json
+
+# The Claude CLI with --output-format json wraps the response in an envelope:
+#   {"type":"result","result":"<model output as string>",...}
+# The actual pipeline JSON is inside the "result" field.
+# It may be a JSON string (needs parsing) or the model may have output
+# the JSON directly. Try multiple extraction strategies.
+
+EXTRACTED=false
+
+# Strategy 1: Direct — the file itself is the pipeline JSON (has .verdict)
+if jq -e '.verdict' pipeline-output.json >/dev/null 2>&1; then
+  echo "Output is direct pipeline JSON"
+  EXTRACTED=true
+fi
+
+# Strategy 2: CLI envelope — extract .result field which contains the JSON as a string
+if [ "$EXTRACTED" = false ]; then
+  RESULT_TEXT=$(jq -r '.result // empty' pipeline-output.json 2>/dev/null)
+  if [ -n "$RESULT_TEXT" ]; then
+    echo "Extracting from CLI envelope .result field..."
+    # The result field may contain the JSON as a string — parse it
+    if echo "$RESULT_TEXT" | jq -e '.verdict' >/dev/null 2>&1; then
+      echo "$RESULT_TEXT" | jq '.' > pipeline-output-extracted.json
+      mv pipeline-output-extracted.json pipeline-output.json
+      EXTRACTED=true
+    fi
+  fi
+fi
+
+# Strategy 3: CLI envelope may have result as an array of content blocks
+if [ "$EXTRACTED" = false ]; then
+  # Try extracting text from content blocks: .result[].text or similar
+  CONTENT_TEXT=$(jq -r '
+    if (.result | type) == "array" then
+      [.result[] | .text // empty] | join("")
+    elif (.content | type) == "array" then
+      [.content[] | .text // empty] | join("")
+    else
+      empty
+    end
+  ' pipeline-output.json 2>/dev/null)
+  if [ -n "$CONTENT_TEXT" ] && echo "$CONTENT_TEXT" | jq -e '.verdict' >/dev/null 2>&1; then
+    echo "Extracting from content blocks..."
+    echo "$CONTENT_TEXT" | jq '.' > pipeline-output-extracted.json
+    mv pipeline-output-extracted.json pipeline-output.json
+    EXTRACTED=true
+  fi
+fi
+
+# Strategy 4: Try to find JSON embedded in text (model may have wrapped it in markdown)
+if [ "$EXTRACTED" = false ]; then
+  echo "Attempting to extract embedded JSON from output..."
+  # Get the raw text from the result field or the whole file
+  RAW_TEXT=$(jq -r '.result // .' pipeline-output.json 2>/dev/null || cat pipeline-output.json)
+  # Extract JSON object between first { and last }
+  EMBEDDED_JSON=$(echo "$RAW_TEXT" | sed -n '/^{/,/^}/p' | head -200)
+  if [ -n "$EMBEDDED_JSON" ] && echo "$EMBEDDED_JSON" | jq -e '.verdict' >/dev/null 2>&1; then
+    echo "$EMBEDDED_JSON" | jq '.' > pipeline-output-extracted.json
+    mv pipeline-output-extracted.json pipeline-output.json
+    EXTRACTED=true
+  fi
+fi
+
+if [ "$EXTRACTED" = false ]; then
+  echo "::error::Could not extract pipeline JSON from CLI output"
+  echo "Full output:"
+  cat pipeline-output.json
+  exit 1
+fi
+
+# Final validation
 if ! jq empty pipeline-output.json 2>/dev/null; then
-  echo "::error::Pipeline produced invalid JSON output"
-  echo "Raw output:"
+  echo "::error::Extracted output is not valid JSON"
   cat pipeline-output.json
   exit 1
 fi
