@@ -1,16 +1,16 @@
-import useSWR from 'swr';
+import useSWR, { type KeyedMutator } from 'swr';
 import type { User } from '@/features/users/types/user';
 
-const fetcher = (url: string) =>
-  fetch(url).then((res) => {
-    if (!res.ok) throw new Error(`Failed to fetch users (${res.status})`);
-    return res.json();
-  });
+interface UseUsersReturn {
+  users: User[];
+  isLoading: boolean;
+  error: string | null;
+  mutate: KeyedMutator<User[]>;
+}
 
-export function useUsers() {
+export function useUsers(): UseUsersReturn {
   const { data, error, isLoading, mutate } = useSWR<User[]>(
-    'https://jsonplaceholder.typicode.com/users',
-    fetcher
+    'https://jsonplaceholder.typicode.com/users'
   );
 
   return {
