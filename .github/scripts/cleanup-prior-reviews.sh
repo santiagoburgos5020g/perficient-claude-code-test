@@ -48,12 +48,21 @@ echo "$REVIEWS" | jq -c '.[]' 2>/dev/null | while IFS= read -r review; do
   body=$(echo "$review" | jq -r '.body // empty')
   review_id=$(echo "$review" | jq -r '.id // empty')
 
+  # Dismiss CHANGES_REQUESTED reviews
   if [[ "$author" == "$BOT_LOGIN" ]] && [[ "$body" == *"$MARKER"* ]] && [[ "$state" == "CHANGES_REQUESTED" ]]; then
-    echo "  Dismissing review #${review_id}..."
+    echo "  Dismissing REQUEST_CHANGES review #${review_id}..."
     retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${review_id}/dismissals" \
       --method PUT \
       --field message="Superseded by new review run" \
       2>/dev/null || echo "::warning::Failed to dismiss review #${review_id}"
+  fi
+
+  # Delete PENDING reviews (left behind by failed prior runs)
+  if [[ "$author" == "$BOT_LOGIN" ]] && [[ "$state" == "PENDING" ]]; then
+    echo "  Deleting PENDING review #${review_id}..."
+    retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${review_id}" \
+      --method DELETE \
+      2>/dev/null || echo "::warning::Failed to delete pending review #${review_id}"
   fi
 done
 
