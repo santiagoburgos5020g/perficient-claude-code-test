@@ -3,10 +3,13 @@
 # Parses the pipeline JSON output and posts a bundled GitHub review.
 #
 # Required env vars: GH_TOKEN, PR_NUMBER, REPO, PIPELINE_OUTCOME
+# Optional env vars: REVIEW_MODE
 
 set -uo pipefail
 
 OUTPUT_FILE="pipeline-output.json"
+
+echo "Review mode: ${REVIEW_MODE:-full}"
 
 # ---------------------------------------------------------------------------
 # Retry helper — exponential backoff (3 attempts: 2s, 4s, 8s)

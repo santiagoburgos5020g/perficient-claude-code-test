@@ -27,6 +27,17 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
 
+      - name: Detect review mode
+        id: detect
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          EVENT_ACTION: ${{ github.event.action }}
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.event.after }}
+        run: bash .github/scripts/detect-review-mode.sh
+
       - name: Clean up prior reviews
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,6 +55,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
         run: bash .github/scripts/run-review-pipeline.sh
 
       - name: Post review to PR
@@ -53,4 +65,5 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           PIPELINE_OUTCOME: ${{ steps.pipeline.outcome }}
+          REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
         run: bash .github/scripts/post-review.sh
