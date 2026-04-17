@@ -1,49 +1,22 @@
-import { useState, useEffect } from 'react';
-
-interface Post {
-  userId: number;
-  id: number;
-  title: string;
-  body: string;
-}
+import { usePosts } from '@/features/posts/hooks/usePosts';
+import PostList from '@/features/posts/components/PostList';
 
 export default function TestReview2Page() {
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('https://jsonplaceholder.typicode.com/posts')
-      .then((res) => res.json())
-      .then((data) => {
-        setPosts(data.slice(0, 40));
-        setLoading(false);
-      })
-      .catch((err) => {
-        setError(err.message);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
-    return <p>Loading posts...</p>;
-  }
-
-  if (error) {
-    return <p>Error: {error}</p>;
-  }
+  const { posts, isLoading, error } = usePosts();
 
   return (
-    <div>
-      <h1>Posts</h1>
-      <ul>
-        {posts.map((post) => (
-          <li key={post.id}>
-            <h3>{post.title}</h3>
-            <p>{post.body}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <main className="bg-white min-h-screen w-full p-8">
+      <h1 className="text-2xl font-bold text-perficient-dark mb-6">Posts</h1>
+
+      {isLoading && (
+        <p className="text-gray-500" role="status" aria-busy="true">Loading posts...</p>
+      )}
+
+      {error && (
+        <p className="text-red-600" role="alert">Error: {error}</p>
+      )}
+
+      {!isLoading && !error && <PostList posts={posts} />}
+    </main>
   );
 }
