@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # post-review.sh
-# Parses the pipeline JSON output and posts a bundled GitHub review.
+# Builds the review summary from the state file and posts a bundled GitHub review.
 #
 # Required env vars: GH_TOKEN, PR_NUMBER, REPO, PIPELINE_OUTCOME
 # Optional env vars: REVIEW_MODE
@@ -8,6 +8,7 @@
 set -uo pipefail
 
 OUTPUT_FILE="pipeline-output.json"
+STATE_FILE=".github/pr/pr-${PR_NUMBER}.json"
 
 echo "Review mode: ${REVIEW_MODE:-full}"
 
@@ -76,7 +77,7 @@ Please re-run the workflow or check the [Actions logs](https://github.com/${REPO
 fi
 
 # ---------------------------------------------------------------------------
-# 2. Validate and parse pipeline output
+# 2. Validate pipeline output
 # ---------------------------------------------------------------------------
 if ! jq empty "$OUTPUT_FILE" 2>/dev/null; then
   echo "::error::Pipeline output is not valid JSON"
@@ -97,56 +98,183 @@ Please re-run the workflow or check the [Actions logs](https://github.com/${REPO
   exit 1
 fi
 
-VERDICT=$(jq -r '.verdict' "$OUTPUT_FILE")
-SUMMARY=$(jq -r '.summary' "$OUTPUT_FILE")
+# ---------------------------------------------------------------------------
+# 3. Build summary from state file
+# ---------------------------------------------------------------------------
+build_summary_from_state() {
+  if [[ ! -f "$STATE_FILE" ]] || ! jq empty "$STATE_FILE" 2>/dev/null; then
+    echo "::warning::State file not available for summary. Using pipeline output summary."
+    jq -r '.summary // "No summary available"' "$OUTPUT_FILE"
+    return
+  fi
+
+  local ROUND REVIEW_TYPE FILES_CHECKED
+  ROUND=$(jq '.reviews | length' "$STATE_FILE")
+  REVIEW_TYPE=$(jq -r '.reviews[-1].type // "full"' "$STATE_FILE")
+  FILES_CHECKED=$(jq '.reviews[-1].files_checked | length' "$STATE_FILE")
+
+  # Compute issue counts
+  local OPEN_ISSUES OPEN_COUNT
+  OPEN_ISSUES=$(jq '[.issues | to_entries[] | select(.value.status == "open") | .value + {id: .key}] | sort_by(.found_in_round)' "$STATE_FILE")
+  OPEN_COUNT=$(echo "$OPEN_ISSUES" | jq 'length')
+
+  local FIXED_ISSUES FIXED_COUNT
+  FIXED_ISSUES=$(jq '[.issues | to_entries[] | select(.value.status == "fixed") | .value + {id: .key}] | sort_by(.found_in_round)' "$STATE_FILE")
+  FIXED_COUNT=$(echo "$FIXED_ISSUES" | jq 'length')
+
+  local NEWLY_FIXED_COUNT NEWLY_FOUND_COUNT REGRESSED_COUNT
+  NEWLY_FIXED_COUNT=$(jq '.reviews[-1].newly_fixed_ids | length' "$STATE_FILE")
+  NEWLY_FOUND_COUNT=$(jq '.reviews[-1].newly_found_ids | length' "$STATE_FILE")
+  REGRESSED_COUNT=$(jq '.reviews[-1].regressed_ids | length' "$STATE_FILE")
+
+  # Determine status
+  local STATUS
+  if (( OPEN_COUNT > 0 )); then
+    STATUS="**BLOCKED**"
+  elif (( FIXED_COUNT > 0 )); then
+    STATUS="**PASSED — Ready to merge**"
+  else
+    STATUS="**PASSED**"
+  fi
+
+  # Start building summary
+  local SUMMARY="<!-- pr-code-review-validator -->
+## PR Review — Round ${ROUND}
+
+| Metric | Value |
+|--------|-------|
+| Review round | ${ROUND} |
+| Review type | $(echo "$REVIEW_TYPE" | sed 's/^./\U&/') |
+| Files checked | ${FILES_CHECKED} |
+| Current issues | ${OPEN_COUNT} |
+| Fixed (this round) | ${NEWLY_FIXED_COUNT} |
+| Fixed (cumulative) | ${FIXED_COUNT} |"
+
+  # Add regressions row if any
+  if (( REGRESSED_COUNT > 0 )); then
+    SUMMARY="${SUMMARY}
+| Regressions | ${REGRESSED_COUNT} |"
+  fi
+
+  SUMMARY="${SUMMARY}
+| Status | ${STATUS} |"
+
+  # List of Changes Fixed (cumulative)
+  if (( FIXED_COUNT > 0 )); then
+    SUMMARY="${SUMMARY}
+
+### List of Changes Fixed
+"
+    local fixed_lines
+    fixed_lines=$(echo "$FIXED_ISSUES" | jq -r '.[] | "- [x] ~~**\(.skill) > \(.rule)** — `\(.path):\(.line)` — \(.description)~~ *(fixed in round \(.resolved_in_round))*"')
+    SUMMARY="${SUMMARY}${fixed_lines}"
+  fi
+
+  # Regressions section
+  if (( REGRESSED_COUNT > 0 )); then
+    local regressed_ids
+    regressed_ids=$(jq -c '.reviews[-1].regressed_ids' "$STATE_FILE")
+
+    SUMMARY="${SUMMARY}
+
+### Regressions
+"
+    local regressed_lines
+    regressed_lines=$(echo "$OPEN_ISSUES" | jq -r --argjson ids "$regressed_ids" '
+      [.[] | select(.id as $i | $ids | index($i) != null)] |
+      .[] | "- [ ] **\(.skill) > \(.rule)** — `\(.path):\(.line)` — \(.description) *(regressed in round \(.found_in_round // "?"))*"
+    ')
+    SUMMARY="${SUMMARY}${regressed_lines}"
+  fi
+
+  # Current Issues
+  if (( OPEN_COUNT > 0 )); then
+    local regressed_ids_for_filter
+    regressed_ids_for_filter=$(jq -c '.reviews[-1].regressed_ids // []' "$STATE_FILE")
+
+    SUMMARY="${SUMMARY}
+
+### Current Issues
+"
+    local issue_lines
+    issue_lines=$(echo "$OPEN_ISSUES" | jq -r --argjson regressed "$regressed_ids_for_filter" '
+      [.[] | select(.id as $i | $regressed | index($i) == null)] |
+      .[] | "- [ ] **\(.skill) > \(.rule)** — `\(.path):\(.line)` — \(.description) *(since round \(.found_in_round))*"
+    ')
+    SUMMARY="${SUMMARY}${issue_lines}"
+  fi
+
+  # All resolved message
+  if (( OPEN_COUNT == 0 && FIXED_COUNT > 0 )); then
+    SUMMARY="${SUMMARY}
+
+All issues resolved. This PR is ready to merge."
+  elif (( OPEN_COUNT == 0 && FIXED_COUNT == 0 )); then
+    SUMMARY="${SUMMARY}
+
+No violations found. This PR is ready to merge."
+  fi
+
+  # Footer
+  SUMMARY="${SUMMARY}
+
+---
+*This review was generated by the PR Code Review Validator (stateful mode).*"
+
+  echo "$SUMMARY"
+}
+
+SUMMARY=$(build_summary_from_state)
+
+# ---------------------------------------------------------------------------
+# 4. Determine verdict and review event from state file
+# ---------------------------------------------------------------------------
+if [[ -f "$STATE_FILE" ]] && jq empty "$STATE_FILE" 2>/dev/null; then
+  OPEN_COUNT=$(jq '[.issues | to_entries[] | select(.value.status == "open")] | length' "$STATE_FILE")
+  if (( OPEN_COUNT > 0 )); then
+    EVENT="REQUEST_CHANGES"
+    EXIT_CODE=1
+  else
+    EVENT="COMMENT"
+    EXIT_CODE=0
+  fi
+else
+  # Fallback to pipeline output
+  VERDICT=$(jq -r '.verdict' "$OUTPUT_FILE")
+  case "$VERDICT" in
+    "fail")
+      EVENT="REQUEST_CHANGES"
+      EXIT_CODE=1
+      ;;
+    "pass"|"skip")
+      EVENT="COMMENT"
+      EXIT_CODE=0
+      ;;
+    *)
+      echo "::error::Unknown verdict: ${VERDICT}"
+      exit 1
+      ;;
+  esac
+fi
+
 NUM_COMMENTS=$(jq '.inline_comments | length' "$OUTPUT_FILE")
 
-echo "Verdict: ${VERDICT}"
+echo "Event: ${EVENT}"
 echo "Inline comments: ${NUM_COMMENTS}"
 
 # ---------------------------------------------------------------------------
-# 3. Determine review event and exit code
-# ---------------------------------------------------------------------------
-case "$VERDICT" in
-  "fail")
-    EVENT="REQUEST_CHANGES"
-    EXIT_CODE=1
-    ;;
-  "pass"|"skip")
-    EVENT="COMMENT"
-    EXIT_CODE=0
-    ;;
-  *)
-    echo "::error::Unknown verdict: ${VERDICT}"
-    exit 1
-    ;;
-esac
-
-# ---------------------------------------------------------------------------
-# 4. Filter inline comments to only lines present in the PR diff
+# 5. Filter inline comments to only lines present in the PR diff
 # ---------------------------------------------------------------------------
 COMMIT_ID=$(git rev-parse HEAD)
 
 if (( NUM_COMMENTS > 0 )); then
   echo "Filtering inline comments against PR diff..."
 
-  # Get the diff to know which files/lines are valid for inline comments
-  DIFF_OUTPUT=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}" --jq '.diff_url' 2>/dev/null || true)
-
-  # Get the list of files in the PR with their patch data
   PR_FILES=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/files" --paginate 2>/dev/null || echo "[]")
 
-  # Build a lookup of valid file paths in the PR
-  VALID_PATHS=$(echo "$PR_FILES" | jq -r '.[].filename' 2>/dev/null || true)
-
-  # Filter comments: keep only those whose path exists in the PR files
-  # For each comment, verify the path is in the diff. We can't easily validate
-  # exact line numbers without parsing patches, so we filter by path and keep
-  # lines as-is (GitHub will reject invalid lines per-comment).
   FILTERED_COMMENTS=$(jq --argjson pr_files "$PR_FILES" '[
     .inline_comments[] |
     . as $comment |
-    # Check if the path exists in PR files
     select(
       ($pr_files | map(.filename) | index($comment.path)) != null
     ) |
@@ -162,11 +290,9 @@ if (( NUM_COMMENTS > 0 )); then
   echo "Filtered: ${FILTERED_COUNT} of ${NUM_COMMENTS} comments have valid paths"
 
   # ---------------------------------------------------------------------------
-  # 5. Post the bundled review
+  # 6. Post the bundled review
   # ---------------------------------------------------------------------------
-
   if (( FILTERED_COUNT > 0 )); then
-    # Try posting with inline comments
     PAYLOAD=$(jq -n \
       --arg event "$EVENT" \
       --arg body "$SUMMARY" \
@@ -179,8 +305,6 @@ if (( NUM_COMMENTS > 0 )); then
         comments: $comments
       }')
 
-    # Count existing reviews from the bot BEFORE posting, so we can detect
-    # if the failed API call still created a review (422 can be partial).
     REVIEWS_BEFORE=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
     BOT_REVIEW_COUNT_BEFORE=$(echo "$REVIEWS_BEFORE" | jq '[.[] | select(.user.login == "github-actions[bot]")] | length')
 
@@ -192,7 +316,6 @@ if (( NUM_COMMENTS > 0 )); then
     else
       echo "::warning::Failed to post review with inline comments (path/line mismatch)."
 
-      # Check if the failed API call still created a review (422 partial creation)
       REVIEWS_AFTER=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null || echo "[]")
       BOT_REVIEW_COUNT_AFTER=$(echo "$REVIEWS_AFTER" | jq '[.[] | select(.user.login == "github-actions[bot]")] | length')
 
@@ -200,7 +323,6 @@ if (( NUM_COMMENTS > 0 )); then
         echo "The API created the review despite the 422 error (without inline comments)."
         echo "Skipping fallback to avoid duplicate review."
       else
-        # No review was created — clean up any PENDING leftovers and post fallback
         echo "No review was created. Cleaning up any PENDING reviews..."
         echo "$REVIEWS_AFTER" | jq -c '.[] | select(.user.login == "github-actions[bot]" and .state == "PENDING")' 2>/dev/null | while IFS= read -r r; do
           rid=$(echo "$r" | jq -r '.id')
@@ -210,7 +332,6 @@ if (( NUM_COMMENTS > 0 )); then
 
         echo "Falling back: posting review body only, with violations in summary..."
 
-        # Append inline comment details to the summary body as a fallback
         COMMENT_DETAILS=$(echo "$FILTERED_COMMENTS" | jq -r '.[] | "- **\(.path):\(.line)** — \(.body | split("\n") | .[0])"')
         FALLBACK_BODY="${SUMMARY}
 
@@ -225,7 +346,6 @@ ${COMMENT_DETAILS}"
       fi
     fi
   else
-    # All comments filtered out — post review body only
     echo "No comments matched PR diff paths. Posting review body only..."
     retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
       --method POST \
@@ -234,7 +354,6 @@ ${COMMENT_DETAILS}"
       --field commit_id="$COMMIT_ID"
   fi
 else
-  # Review without inline comments (pass/skip)
   echo "Posting review (no inline comments)..."
   retry gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" \
     --method POST \
@@ -244,7 +363,7 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# 5. On pass/skip, dismiss any lingering REQUEST_CHANGES reviews
+# 7. On pass/skip, dismiss any lingering REQUEST_CHANGES reviews
 # ---------------------------------------------------------------------------
 if (( EXIT_CODE == 0 )); then
   echo "Verdict is pass/skip — running cleanup for any lingering reviews..."

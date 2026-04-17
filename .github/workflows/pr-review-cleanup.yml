@@ -1,0 +1,46 @@
+name: PR Review Cleanup
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: ${{ github.event.pull_request.merged == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete review state file
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          STATE_FILE=".github/pr/pr-${PR_NUMBER}.json"
+
+          if [[ -f "$STATE_FILE" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+            git rm "$STATE_FILE"
+
+            # Remove directory if empty
+            if [[ -d ".github/pr" ]] && [[ -z "$(ls -A .github/pr 2>/dev/null)" ]]; then
+              rmdir .github/pr 2>/dev/null || true
+            fi
+
+            git commit -m "chore(review): cleanup pr-${PR_NUMBER} review state"
+            git push
+            echo "Review state file deleted for PR #${PR_NUMBER}."
+          else
+            echo "No state file found for PR #${PR_NUMBER}. Nothing to clean up."
+          fi
