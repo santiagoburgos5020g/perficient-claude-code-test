@@ -66,20 +66,20 @@ if [[ "${REVIEW_MODE:-full}" == "incremental" ]] && [[ -f "$CONTEXT_FILE" ]]; th
   # -----------------------------------------------------------------------
   if (( DELETED_COUNT > 0 )); then
     echo "Handling ${DELETED_COUNT} deleted file(s)..."
-    for del_file in $(echo "$DELETED_FILES" | jq -r '.[]'); do
+    while IFS= read -r del_file; do
       # Find open issues on this deleted file
-      DEL_ISSUE_IDS=$(echo "$STATE_JSON" | jq -r --arg path "$del_file" '
-        .issues | to_entries[] | select(.value.status == "open" and .value.path == $path) | .key
-      ')
-      for issue_id in $DEL_ISSUE_IDS; do
+      while IFS= read -r issue_id; do
+        [[ -z "$issue_id" ]] && continue
         echo "  Marking ${issue_id} as fixed (file deleted: ${del_file})"
         STATE_JSON=$(echo "$STATE_JSON" | jq \
           --arg id "$issue_id" \
           --argjson round "$ROUND" \
           '.issues[$id].status = "fixed" | .issues[$id].resolved_in_round = $round')
         NEWLY_FIXED_IDS=$(echo "$NEWLY_FIXED_IDS" | jq --arg id "$issue_id" '. + [$id]')
-      done
-    done
+      done < <(echo "$STATE_JSON" | jq -r --arg path "$del_file" '
+        .issues | to_entries[] | select(.value.status == "open" and .value.path == $path) | .key
+      ')
+    done < <(echo "$DELETED_FILES" | jq -r '.[]')
   fi
 
   # -----------------------------------------------------------------------
@@ -98,9 +98,7 @@ if [[ "${REVIEW_MODE:-full}" == "incremental" ]] && [[ -f "$CONTEXT_FILE" ]]; th
     echo "Verifying ${VERIFY_COUNT} issue(s) across touched files..."
 
     # Group issues by file path
-    FILE_PATHS=$(echo "$ALL_ISSUES_TO_VERIFY" | jq -r '[.[].path] | unique | .[]')
-
-    for file_path in $FILE_PATHS; do
+    while IFS= read -r file_path; do
       if [[ ! -f "$file_path" ]]; then
         echo "  Skipping ${file_path} (file no longer exists)"
         continue
@@ -194,7 +192,7 @@ Output ONLY a JSON array:
       fi
 
       # Process each verification result
-      for row in $(echo "$VERIFY_RESULT" | jq -c '.[]'); do
+      while IFS= read -r row; do
         ISSUE_ID=$(echo "$row" | jq -r '.id')
         ISSUE_STATUS=$(echo "$row" | jq -r '.status')
         EXPLANATION=$(echo "$row" | jq -r '.explanation')
@@ -223,8 +221,8 @@ Output ONLY a JSON array:
         elif [[ "$CURRENT_STATUS" == "fixed" ]] && [[ "$ISSUE_STATUS" == "FIXED" ]]; then
           echo "    ${ISSUE_ID}: still fixed"
         fi
-      done
-    done
+      done < <(echo "$VERIFY_RESULT" | jq -c '.[]')
+    done < <(echo "$ALL_ISSUES_TO_VERIFY" | jq -r '[.[].path] | unique | .[]')
   else
     echo "No issues to verify on touched files."
   fi
@@ -586,7 +584,7 @@ PARTB_PROMPT
 
     if (( NEW_VIOLATION_COUNT > 0 )); then
       echo "Part B found ${NEW_VIOLATION_COUNT} new violation(s)"
-      for row in $(echo "$NEW_VIOLATIONS" | jq -c '.[]'); do
+      while IFS= read -r row; do
         ISSUE_ID="issue-${NEXT_ID}"
         SKILL=$(echo "$row" | jq -r '.skill // "unknown"')
         RULE=$(echo "$row" | jq -r '.rule // "unknown"')
@@ -626,7 +624,7 @@ PARTB_PROMPT
           }')
         NEWLY_FOUND_IDS=$(echo "$NEWLY_FOUND_IDS" | jq --arg id "$ISSUE_ID" '. + [$id]')
         NEXT_ID=$((NEXT_ID + 1))
-      done
+      done < <(echo "$NEW_VIOLATIONS" | jq -c '.[]')
 
       STATE_JSON=$(echo "$STATE_JSON" | jq --argjson next "$NEXT_ID" '.next_issue_id = $next')
     else
@@ -1372,7 +1370,7 @@ ISSUES='{}'
 FOUND_IDS='[]'
 
 if (( VIOLATION_COUNT > 0 )); then
-  for row in $(echo "$CONFIRMED_VIOLATIONS" | jq -c '.[]'); do
+  while IFS= read -r row; do
     ISSUE_ID="issue-${NEXT_ID}"
     SKILL=$(echo "$row" | jq -r '.skill // "unknown"')
     RULE=$(echo "$row" | jq -r '.rule // "unknown"')
@@ -1411,7 +1409,7 @@ if (( VIOLATION_COUNT > 0 )); then
       }}')
     FOUND_IDS=$(echo "$FOUND_IDS" | jq --arg id "$ISSUE_ID" '. + [$id]')
     NEXT_ID=$((NEXT_ID + 1))
-  done
+  done < <(echo "$CONFIRMED_VIOLATIONS" | jq -c '.[]')
 fi
 
 FILES_CHECKED=$(jq -c '.stats.files_checked // 0' pipeline-output.json)
