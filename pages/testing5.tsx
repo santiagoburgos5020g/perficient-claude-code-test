@@ -1,34 +1,8 @@
-import { useEffect, useState } from 'react';
-
-interface Todo {
-  userId: number;
-  id: number;
-  title: string;
-  completed: boolean;
-}
+import { useTodos } from '@/hooks/useTodos';
+import TodoList from '@/components/TodoList/TodoList';
 
 export default function Testing5Page() {
-  const [todos, setTodos] = useState<Todo[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch('https://jsonplaceholder.typicode.com/todos')
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((data: Todo[]) => {
-        setTodos(data);
-        setIsLoading(false);
-      })
-      .catch((err: Error) => {
-        setError(err.message);
-        setIsLoading(false);
-      });
-  }, []);
+  const { todos, isLoading, error } = useTodos();
 
   return (
     <main className="bg-white min-h-screen w-full p-8">
@@ -42,18 +16,7 @@ export default function Testing5Page() {
         <p className="text-red-600" role="alert">Error: {error}</p>
       )}
 
-      {!isLoading && !error && (
-        <ul className="space-y-2">
-          {todos.map((todo) => (
-            <li key={todo.id} className="flex items-center gap-2 p-2 border rounded">
-              <input type="checkbox" checked={todo.completed} readOnly className="h-4 w-4" />
-              <span className={todo.completed ? 'line-through text-gray-400' : 'text-gray-800'}>
-                {todo.title}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {!isLoading && !error && <TodoList todos={todos} />}
     </main>
   );
 }
