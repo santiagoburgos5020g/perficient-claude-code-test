@@ -56,13 +56,16 @@ REVIEWS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/nu
   exit 0
 }
 
-# Find the most recent CHANGES_REQUESTED review from the bot with our marker.
+# Find the most recent CHANGES_REQUESTED or DISMISSED review from the bot with
+# our marker. DISMISSED reviews were previously CHANGES_REQUESTED but got
+# dismissed by cleanup — they still contain valid violation data and resolved
+# history needed for incremental mode.
 # Sort by submitted_at descending and take the first.
 PRIOR_REVIEW=$(echo "$REVIEWS" | jq -c --arg bot "$BOT_LOGIN" --arg marker "$MARKER" '
   [ .[] | select(
     .user.login == $bot and
     (.body | contains($marker)) and
-    .state == "CHANGES_REQUESTED"
+    (.state == "CHANGES_REQUESTED" or .state == "DISMISSED")
   )] | sort_by(.submitted_at) | reverse | .[0] // empty
 ')
 
