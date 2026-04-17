@@ -19,9 +19,9 @@ export default function TodosPage() {
   }
 
   return (
-    <div className="bg-white min-h-screen w-full p-8">
+    <main className="bg-white min-h-screen w-full p-8">
       <h1 className="text-2xl font-bold mb-6">Todos ({todos.length})</h1>
       <TodoList todos={todos} />
-    </div>
+    </main>
   );
 }
