@@ -5,7 +5,7 @@ import type { ApiEnvelope } from '@/lib/api-handler';
 interface UseTodosReturn {
   todos: Todo[];
   isLoading: boolean;
-  error: string | null;
+  error: Error | undefined;
   mutate: KeyedMutator<ApiEnvelope<Todo[]>>;
 }
 
@@ -15,9 +15,9 @@ export function useTodos(): UseTodosReturn {
   );
 
   return {
-    todos: (data?.data as Todo[]) ?? [],
+    todos: data?.data ?? [],
     isLoading,
-    error: error instanceof Error ? error.message : (data?.error ?? null),
+    error,
     mutate,
   };
 }

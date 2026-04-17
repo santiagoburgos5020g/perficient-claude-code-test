@@ -4,7 +4,7 @@ import type { Post } from '@/types/post';
 interface UsePostsReturn {
   posts: Post[];
   isLoading: boolean;
-  error: string | null;
+  error: Error | undefined;
   mutate: KeyedMutator<Post[]>;
 }
 
@@ -16,7 +16,7 @@ export function usePosts(): UsePostsReturn {
   return {
     posts: data?.slice(0, 40) ?? [],
     isLoading,
-    error: error instanceof Error ? error.message : null,
+    error,
     mutate,
   };
 }

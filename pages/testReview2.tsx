@@ -13,7 +13,7 @@ export default function TestReview2Page() {
       )}
 
       {error && (
-        <p className="text-red-600" role="alert">Error: {error}</p>
+        <p className="text-red-600" role="alert">Error: {error.message}</p>
       )}
 
       {!isLoading && !error && <PostList posts={posts} />}

@@ -13,7 +13,7 @@ export default function Testing5Page() {
       )}
 
       {error && (
-        <p className="text-red-600" role="alert">Error: {error}</p>
+        <p className="text-red-600" role="alert">Error: {error.message}</p>
       )}
 
       {!isLoading && !error && <TodoList todos={todos} />}
