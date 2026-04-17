@@ -1,0 +1,22 @@
+import useSWR, { type KeyedMutator } from 'swr';
+import type { Todo } from '@/features/todos/types/todo';
+
+interface UseTodosReturn {
+  todos: Todo[];
+  isLoading: boolean;
+  error: string | null;
+  mutate: KeyedMutator<Todo[]>;
+}
+
+export function useTodos(): UseTodosReturn {
+  const { data, error, isLoading, mutate } = useSWR<Todo[]>(
+    'https://jsonplaceholder.typicode.com/todos'
+  );
+
+  return {
+    todos: data ?? [],
+    isLoading,
+    error: error ? (error as Error).message : null,
+    mutate,
+  };
+}
