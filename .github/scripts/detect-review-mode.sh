@@ -115,6 +115,16 @@ if [[ "$PRIOR_COUNT" -eq 0 ]]; then
 fi
 
 # ---------------------------------------------------------------------------
+# 6b. Extract resolved history from prior review body (if present)
+# ---------------------------------------------------------------------------
+PREVIOUSLY_RESOLVED=$(echo "$PRIOR_BODY" | grep -oP '(?<=<!-- resolved-history: ).*(?= -->)' | head -1)
+if [[ -z "$PREVIOUSLY_RESOLVED" ]] || ! echo "$PREVIOUSLY_RESOLVED" | jq empty 2>/dev/null; then
+  PREVIOUSLY_RESOLVED="[]"
+fi
+PREVIOUSLY_RESOLVED_COUNT=$(echo "$PREVIOUSLY_RESOLVED" | jq 'length')
+echo "Previously resolved violations: ${PREVIOUSLY_RESOLVED_COUNT}"
+
+# ---------------------------------------------------------------------------
 # 7. Compute incremental diff (files changed in the new push only)
 # ---------------------------------------------------------------------------
 echo "Computing incremental diff (${BEFORE_SHA}..${AFTER_SHA})..."
@@ -178,6 +188,11 @@ CARRIED_FORWARD=$(echo "$PRIOR_VIOLATIONS" | jq -c --argjson untouched "$UNTOUCH
   [.[] | select(.path as $p | $untouched | index($p) != null)]
 ')
 
+# touched_file_violations = prior violations on files that WERE touched (for diffing in re-validation)
+TOUCHED_FILE_VIOLATIONS=$(echo "$PRIOR_VIOLATIONS" | jq -c --argjson touched "$TOUCHED_VIOLATION_FILES" '
+  [.[] | select(.path as $p | $touched | index($p) != null)]
+')
+
 # files_to_validate = touched violation files + new paths
 FILES_TO_VALIDATE=$(jq -n \
   --argjson touched "$TOUCHED_VIOLATION_FILES" \
@@ -217,6 +232,8 @@ jq -n \
   --argjson untouched_violation_files "$UNTOUCHED_VIOLATION_FILES" \
   --argjson new_paths "$NEW_PATHS" \
   --argjson carried_forward_violations "$CARRIED_FORWARD" \
+  --argjson touched_file_violations "$TOUCHED_FILE_VIOLATIONS" \
+  --argjson previously_resolved "$PREVIOUSLY_RESOLVED" \
   --argjson files_to_validate "$FILES_TO_VALIDATE" \
   '{
     review_mode: $review_mode,
@@ -228,6 +245,8 @@ jq -n \
     untouched_violation_files: $untouched_violation_files,
     new_paths: $new_paths,
     carried_forward_violations: $carried_forward_violations,
+    touched_file_violations: $touched_file_violations,
+    previously_resolved: $previously_resolved,
     files_to_validate: $files_to_validate
   }' > prior-findings.json
 
