@@ -1,5 +1,5 @@
-import { usePosts } from '@/features/posts/hooks/usePosts';
-import PostList from '@/features/posts/components/PostList';
+import { usePosts } from '@/hooks/usePosts';
+import PostList from '@/components/PostList/PostList';
 
 export default function TestReview2Page() {
   const { posts, isLoading, error } = usePosts();

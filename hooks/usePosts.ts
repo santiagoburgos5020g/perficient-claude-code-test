@@ -1,5 +1,5 @@
 import useSWR, { type KeyedMutator } from 'swr';
-import type { Post } from '@/features/posts/types/post';
+import type { Post } from '@/types/post';
 
 interface UsePostsReturn {
   posts: Post[];
@@ -10,13 +10,13 @@ interface UsePostsReturn {
 
 export function usePosts(): UsePostsReturn {
   const { data, error, isLoading, mutate } = useSWR<Post[]>(
-    'https://jsonplaceholder.typicode.com/posts'
+    '/api/posts'
   );
 
   return {
     posts: data?.slice(0, 40) ?? [],
     isLoading,
-    error: error ? (error as Error).message : null,
+    error: error instanceof Error ? error.message : null,
     mutate,
   };
 }
