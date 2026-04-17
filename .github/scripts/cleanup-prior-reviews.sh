@@ -2,6 +2,8 @@
 # cleanup-prior-reviews.sh
 # Dismiss prior REQUEST_CHANGES reviews and minimize old inline comments
 # from previous runs of the PR Code Review Validator.
+# State is now tracked in .github/pr/pr-{number}.json; this script only
+# handles GitHub review cleanup (dismiss + minimize).
 #
 # Required env vars: GH_TOKEN, PR_NUMBER, REPO
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # detect-review-mode.sh
 # Determines whether this PR review should be FULL or INCREMENTAL.
-# On incremental mode, extracts prior findings into prior-findings.json
-# so the pipeline can carry forward untouched violations and only
-# re-validate changed files.
+# Reads persistent state from .github/pr/pr-{number}.json instead of
+# parsing GitHub review comments. Outputs review-context.json for the
+# pipeline to consume.
 #
 # Required env vars: GH_TOKEN, PR_NUMBER, REPO, EVENT_ACTION, BEFORE_SHA, AFTER_SHA
 # Outputs: review_mode (full|incremental) via $GITHUB_OUTPUT
@@ -11,16 +11,16 @@
 set -uo pipefail
 
 MARKER="<!-- pr-code-review-validator -->"
-BOT_LOGIN="github-actions[bot]"
+STATE_FILE=".github/pr/pr-${PR_NUMBER}.json"
 
 # ---------------------------------------------------------------------------
-# Helper: output review_mode and write minimal prior-findings.json for full mode
+# Helper: output review_mode=full and write minimal review-context.json
 # ---------------------------------------------------------------------------
 set_full_mode() {
   local reason="${1:-unspecified}"
   echo "Review mode: FULL (reason: ${reason})"
   echo "review_mode=full" >> "$GITHUB_OUTPUT"
-  jq -n '{"review_mode":"full"}' > prior-findings.json
+  jq -n --arg reason "$reason" '{"review_mode":"full","reason":$reason}' > review-context.json
 }
 
 # ---------------------------------------------------------------------------
@@ -48,79 +48,43 @@ if ! git merge-base --is-ancestor "$BEFORE_SHA" "$AFTER_SHA" 2>/dev/null; then
 fi
 
 # ---------------------------------------------------------------------------
-# 4. Fetch the most recent bot review with our marker
+# 4. Read state file
 # ---------------------------------------------------------------------------
-echo "Fetching prior bot reviews..."
-REVIEWS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews" --paginate 2>/dev/null) || {
-  set_full_mode "could not fetch reviews"
-  exit 0
-}
-
-# Find the most recent CHANGES_REQUESTED review from the bot with our marker.
-# Sort by submitted_at descending and take the first.
-PRIOR_REVIEW=$(echo "$REVIEWS" | jq -c --arg bot "$BOT_LOGIN" --arg marker "$MARKER" '
-  [ .[] | select(
-    .user.login == $bot and
-    (.body | contains($marker)) and
-    .state == "CHANGES_REQUESTED"
-  )] | sort_by(.submitted_at) | reverse | .[0] // empty
-')
-
-if [[ -z "$PRIOR_REVIEW" ]]; then
-  set_full_mode "no prior CHANGES_REQUESTED bot review found"
+if [[ ! -f "$STATE_FILE" ]]; then
+  set_full_mode "no state file found"
   exit 0
 fi
 
-PRIOR_REVIEW_ID=$(echo "$PRIOR_REVIEW" | jq -r '.id')
-PRIOR_BODY=$(echo "$PRIOR_REVIEW" | jq -r '.body // empty')
-
-echo "Found prior review #${PRIOR_REVIEW_ID}"
-
-# ---------------------------------------------------------------------------
-# 5. Check if prior review had violations (VIOLATIONS FOUND in body)
-# ---------------------------------------------------------------------------
-if [[ "$PRIOR_BODY" != *"VIOLATIONS FOUND"* ]]; then
-  set_full_mode "prior review did not contain violations (was pass/skip)"
+if ! jq empty "$STATE_FILE" 2>/dev/null; then
+  set_full_mode "state file is malformed JSON"
   exit 0
 fi
 
-# ---------------------------------------------------------------------------
-# 6. Fetch inline comments for that review
-# ---------------------------------------------------------------------------
-echo "Fetching inline comments for review #${PRIOR_REVIEW_ID}..."
-REVIEW_COMMENTS=$(gh api "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${PRIOR_REVIEW_ID}/comments" --paginate 2>/dev/null) || {
-  set_full_mode "could not fetch review comments"
-  exit 0
-}
-
-# Parse each comment: extract path, line, side, body, skill, rule
-PRIOR_VIOLATIONS=$(echo "$REVIEW_COMMENTS" | jq -c --arg marker "$MARKER" '[
-  .[] | select(.body | contains($marker)) |
-  {
-    path: .path,
-    line: (.original_line // .line // 1),
-    side: "RIGHT",
-    body: .body,
-    skill: (try (.body | capture("^\\*\\*(?<s>[^>]+)>") | .s | ltrimstr(" ") | rtrimstr(" ")) catch "unknown"),
-    rule: (try (.body | capture("^\\*\\*[^>]+>\\s*(?<r>[^*]+)\\*\\*") | .r | ltrimstr(" ") | rtrimstr(" ")) catch "unknown")
-  }
-]')
-
-PRIOR_COUNT=$(echo "$PRIOR_VIOLATIONS" | jq 'length')
-echo "Found ${PRIOR_COUNT} prior inline violations"
-
-if [[ "$PRIOR_COUNT" -eq 0 ]]; then
-  set_full_mode "prior review had no parseable inline comments"
-  exit 0
-fi
+echo "Reading state from ${STATE_FILE}..."
 
 # ---------------------------------------------------------------------------
-# 7. Compute incremental diff (files changed in the new push only)
+# 5. Extract open and fixed issues from state
 # ---------------------------------------------------------------------------
-echo "Computing incremental diff (${BEFORE_SHA}..${AFTER_SHA})..."
-INCREMENTAL_FILES=$(git diff --name-only "${BEFORE_SHA}..${AFTER_SHA}" 2>/dev/null || true)
+OPEN_ISSUES=$(jq -c '[.issues | to_entries[] | select(.value.status == "open") | .value + {id: .key}]' "$STATE_FILE")
+FIXED_ISSUES=$(jq -c '[.issues | to_entries[] | select(.value.status == "fixed") | .value + {id: .key}]' "$STATE_FILE")
+LAST_COMMIT=$(jq -r '.reviews[-1].commit_sha // empty' "$STATE_FILE")
+ROUND=$(jq '.reviews | length' "$STATE_FILE")
 
-# Filter to code files only (same patterns as run-review-pipeline.sh)
+OPEN_COUNT=$(echo "$OPEN_ISSUES" | jq 'length')
+FIXED_COUNT=$(echo "$FIXED_ISSUES" | jq 'length')
+
+echo "State: round ${ROUND}, ${OPEN_COUNT} open issues, ${FIXED_COUNT} fixed issues"
+echo "Last reviewed commit: ${LAST_COMMIT:-unknown}"
+
+# ---------------------------------------------------------------------------
+# 6. Compute incremental diff from last reviewed commit
+# ---------------------------------------------------------------------------
+DIFF_BASE="${LAST_COMMIT:-$BEFORE_SHA}"
+
+echo "Computing incremental diff (${DIFF_BASE}..HEAD)..."
+INCREMENTAL_FILES=$(git diff --name-only "${DIFF_BASE}..HEAD" 2>/dev/null || true)
+
+# Filter to code files only
 INCREMENTAL_CODE_FILES=$(echo "$INCREMENTAL_FILES" | grep -E '\.(ts|tsx|js|jsx|prisma|sql)$' || true)
 
 # Exclude non-code directories
@@ -136,100 +100,93 @@ INCREMENTAL_COUNT=$(echo "$INCREMENTAL_ARRAY" | jq 'length')
 echo "Incremental code files: ${INCREMENTAL_COUNT}"
 
 # ---------------------------------------------------------------------------
-# 8. Cross-reference: which prior violations were touched vs untouched
+# 7. Cross-reference issues with changed files
 # ---------------------------------------------------------------------------
 
-# Get unique paths from prior violations
-PRIOR_VIOLATION_PATHS=$(echo "$PRIOR_VIOLATIONS" | jq '[.[].path] | unique')
+# Get unique paths from all issues (open + fixed)
+ALL_ISSUE_PATHS=$(jq -c '[.issues | to_entries[] | .value.path] | unique' "$STATE_FILE")
 
-# Compute intersections
-# touched_violation_files = prior violation paths that appear in incremental diff
-TOUCHED_VIOLATION_FILES=$(jq -n \
-  --argjson prior "$PRIOR_VIOLATION_PATHS" \
-  --argjson incr "$INCREMENTAL_ARRAY" \
-  '[$prior[] | select(. as $p | $incr | index($p) != null)]')
-
-# untouched_violation_files = prior violation paths NOT in incremental diff
-# Also exclude files that were deleted (no longer exist in the repo)
-UNTOUCHED_VIOLATION_FILES=$(jq -n \
-  --argjson prior "$PRIOR_VIOLATION_PATHS" \
-  --argjson incr "$INCREMENTAL_ARRAY" \
-  '[$prior[] | select(. as $p | $incr | index($p) == null)]')
-
-# Filter out deleted files from untouched list
-UNTOUCHED_EXISTING='[]'
-for file in $(echo "$UNTOUCHED_VIOLATION_FILES" | jq -r '.[]'); do
-  if [[ -f "$file" ]]; then
-    UNTOUCHED_EXISTING=$(echo "$UNTOUCHED_EXISTING" | jq --arg f "$file" '. + [$f]')
-  else
-    echo "  Skipping deleted file: ${file}"
-  fi
-done
-UNTOUCHED_VIOLATION_FILES="$UNTOUCHED_EXISTING"
-
-# new_paths = incremental files that had NO prior violations
-NEW_PATHS=$(jq -n \
-  --argjson prior "$PRIOR_VIOLATION_PATHS" \
-  --argjson incr "$INCREMENTAL_ARRAY" \
-  '[$incr[] | select(. as $p | $prior | index($p) == null)]')
-
-# carried_forward_violations = violations on untouched files (include verbatim)
-CARRIED_FORWARD=$(echo "$PRIOR_VIOLATIONS" | jq -c --argjson untouched "$UNTOUCHED_VIOLATION_FILES" '
-  [.[] | select(.path as $p | $untouched | index($p) != null)]
+# Open issues on touched files (need verification)
+OPEN_ON_TOUCHED=$(echo "$OPEN_ISSUES" | jq -c --argjson incr "$INCREMENTAL_ARRAY" '
+  [.[] | select(.path as $p | $incr | index($p) != null)]
 ')
 
-# files_to_validate = touched violation files + new paths
-FILES_TO_VALIDATE=$(jq -n \
-  --argjson touched "$TOUCHED_VIOLATION_FILES" \
-  --argjson new_paths "$NEW_PATHS" \
-  '$touched + $new_paths | unique')
+# Fixed issues on touched files (need regression check)
+FIXED_ON_TOUCHED=$(echo "$FIXED_ISSUES" | jq -c --argjson incr "$INCREMENTAL_ARRAY" '
+  [.[] | select(.path as $p | $incr | index($p) != null)]
+')
+
+# Detect deleted files in the diff
+DELETED_FILES='[]'
+for file in $(echo "$INCREMENTAL_ARRAY" | jq -r '.[]'); do
+  if [[ ! -f "$file" ]]; then
+    DELETED_FILES=$(echo "$DELETED_FILES" | jq --arg f "$file" '. + [$f]')
+  fi
+done
+
+# New files: in incremental diff but not referenced by any issue
+NEW_FILES=$(jq -n \
+  --argjson all_paths "$ALL_ISSUE_PATHS" \
+  --argjson incr "$INCREMENTAL_ARRAY" \
+  '[$incr[] | select(. as $p | $all_paths | index($p) == null)]')
+
+# Touched files: files in diff that ARE referenced by issues
+TOUCHED_FILES=$(jq -n \
+  --argjson all_paths "$ALL_ISSUE_PATHS" \
+  --argjson incr "$INCREMENTAL_ARRAY" \
+  '[$incr[] | select(. as $p | $all_paths | index($p) != null)]')
+
+# Files to validate in Part B = new files only (touched files go through verification)
+FILES_TO_VALIDATE_B=$(echo "$NEW_FILES" | jq -c '.')
 
 # ---------------------------------------------------------------------------
-# 9. Log summary
+# 8. Log summary
 # ---------------------------------------------------------------------------
-CARRIED_COUNT=$(echo "$CARRIED_FORWARD" | jq 'length')
-TOUCHED_COUNT=$(echo "$TOUCHED_VIOLATION_FILES" | jq 'length')
-NEW_COUNT=$(echo "$NEW_PATHS" | jq 'length')
-VALIDATE_COUNT=$(echo "$FILES_TO_VALIDATE" | jq 'length')
+OPEN_ON_TOUCHED_COUNT=$(echo "$OPEN_ON_TOUCHED" | jq 'length')
+FIXED_ON_TOUCHED_COUNT=$(echo "$FIXED_ON_TOUCHED" | jq 'length')
+DELETED_COUNT=$(echo "$DELETED_FILES" | jq 'length')
+NEW_COUNT=$(echo "$NEW_FILES" | jq 'length')
+TOUCHED_COUNT=$(echo "$TOUCHED_FILES" | jq 'length')
 
 echo ""
 echo "=============================="
 echo "  Incremental Review Summary"
 echo "=============================="
-echo "  Prior violations:       ${PRIOR_COUNT}"
-echo "  Carried forward:        ${CARRIED_COUNT}"
-echo "  Files re-validating:    ${TOUCHED_COUNT}"
-echo "  New files to validate:  ${NEW_COUNT}"
-echo "  Total to validate:      ${VALIDATE_COUNT}"
+echo "  Open issues total:              ${OPEN_COUNT}"
+echo "  Open issues on touched files:   ${OPEN_ON_TOUCHED_COUNT}"
+echo "  Fixed issues on touched files:  ${FIXED_ON_TOUCHED_COUNT}"
+echo "  Deleted files:                  ${DELETED_COUNT}"
+echo "  Touched files (with issues):    ${TOUCHED_COUNT}"
+echo "  New files to validate:          ${NEW_COUNT}"
 echo "=============================="
 echo ""
 
 # ---------------------------------------------------------------------------
-# 10. Write prior-findings.json and output review_mode
+# 9. Write review-context.json and output review_mode
 # ---------------------------------------------------------------------------
 jq -n \
   --arg review_mode "incremental" \
-  --argjson prior_review_id "$PRIOR_REVIEW_ID" \
-  --arg prior_verdict "fail" \
-  --argjson prior_violations "$PRIOR_VIOLATIONS" \
-  --argjson incremental_files "$INCREMENTAL_ARRAY" \
-  --argjson touched_violation_files "$TOUCHED_VIOLATION_FILES" \
-  --argjson untouched_violation_files "$UNTOUCHED_VIOLATION_FILES" \
-  --argjson new_paths "$NEW_PATHS" \
-  --argjson carried_forward_violations "$CARRIED_FORWARD" \
-  --argjson files_to_validate "$FILES_TO_VALIDATE" \
+  --argjson round "$((ROUND + 1))" \
+  --arg state_file "$STATE_FILE" \
+  --arg last_reviewed_commit "$DIFF_BASE" \
+  --argjson open_issues_to_verify "$OPEN_ON_TOUCHED" \
+  --argjson fixed_issues_to_check_regression "$FIXED_ON_TOUCHED" \
+  --argjson deleted_files "$DELETED_FILES" \
+  --argjson new_files_to_validate "$FILES_TO_VALIDATE_B" \
+  --argjson touched_files "$TOUCHED_FILES" \
+  --argjson all_incremental_files "$INCREMENTAL_ARRAY" \
   '{
     review_mode: $review_mode,
-    prior_review_id: $prior_review_id,
-    prior_verdict: $prior_verdict,
-    prior_violations: $prior_violations,
-    incremental_files: $incremental_files,
-    touched_violation_files: $touched_violation_files,
-    untouched_violation_files: $untouched_violation_files,
-    new_paths: $new_paths,
-    carried_forward_violations: $carried_forward_violations,
-    files_to_validate: $files_to_validate
-  }' > prior-findings.json
+    round: $round,
+    state_file: $state_file,
+    last_reviewed_commit: $last_reviewed_commit,
+    open_issues_to_verify: $open_issues_to_verify,
+    fixed_issues_to_check_regression: $fixed_issues_to_check_regression,
+    deleted_files: $deleted_files,
+    new_files_to_validate: $new_files_to_validate,
+    touched_files: $touched_files,
+    all_incremental_files: $all_incremental_files
+  }' > review-context.json
 
 echo "review_mode=incremental" >> "$GITHUB_OUTPUT"
 echo "Review mode: INCREMENTAL"

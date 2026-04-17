@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # post-review.sh
 # Parses the pipeline JSON output and posts a bundled GitHub review.
+# Works with both full and incremental (stateful) review modes.
+# The pipeline generates the complete summary; this script posts it.
 #
 # Required env vars: GH_TOKEN, PR_NUMBER, REPO, PIPELINE_OUTCOME
 # Optional env vars: REVIEW_MODE

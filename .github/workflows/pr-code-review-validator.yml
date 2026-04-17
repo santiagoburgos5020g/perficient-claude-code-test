@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
 
     steps:
@@ -23,11 +23,28 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check for bot-only changes
+        id: skip-check
+        if: ${{ github.event.action == 'synchronize' }}
+        run: |
+          CHANGED=$(git diff --name-only ${{ github.event.before }}..${{ github.event.after }} || true)
+          NON_REVIEW=$(echo "$CHANGED" | grep -v '^\.github/pr/' || true)
+          if [[ -z "$NON_REVIEW" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping: only review state files changed"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install Claude Code CLI
+        if: steps.skip-check.outputs.skip != 'true'
         run: npm install -g @anthropic-ai/claude-code
 
       - name: Detect review mode
+        if: steps.skip-check.outputs.skip != 'true'
         id: detect
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -39,6 +56,7 @@ jobs:
         run: bash .github/scripts/detect-review-mode.sh
 
       - name: Clean up prior reviews
+        if: steps.skip-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -46,6 +64,7 @@ jobs:
         run: bash .github/scripts/cleanup-prior-reviews.sh
 
       - name: Run review pipeline
+        if: steps.skip-check.outputs.skip != 'true'
         id: pipeline
         env:
           ANTHROPIC_BEDROCK_BASE_URL: ${{ secrets.BEDROCK_BASE_URL }}
@@ -56,10 +75,11 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
+          HEAD_BRANCH: ${{ github.head_ref }}
         run: bash .github/scripts/run-review-pipeline.sh
 
       - name: Post review to PR
-        if: always() && steps.pipeline.outcome != 'cancelled'
+        if: always() && steps.pipeline.outcome != 'cancelled' && steps.skip-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -67,3 +87,10 @@ jobs:
           PIPELINE_OUTCOME: ${{ steps.pipeline.outcome }}
           REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
         run: bash .github/scripts/post-review.sh
+
+      - name: Commit review state
+        if: always() && steps.skip-check.outputs.skip != 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_BRANCH: ${{ github.head_ref }}
+        run: bash .github/scripts/commit-review-state.sh
