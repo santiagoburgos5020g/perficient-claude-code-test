@@ -1,0 +1,21 @@
+{
+  "pr_number": 31,
+  "base_branch": "main",
+  "head_branch": "feature/code-review-2",
+  "created_at": "2026-04-17T22:59:59Z",
+  "last_updated": "2026-04-17T22:59:59Z",
+  "next_issue_id": 1,
+  "reviews": [
+    {
+      "round": 1,
+      "commit_sha": "c7fa772033b1684902c4f7ed9e12f429eb90bc65",
+      "timestamp": "2026-04-17T22:59:59Z",
+      "type": "full",
+      "files_checked": 4,
+      "newly_fixed_ids": [],
+      "newly_found_ids": [],
+      "regressed_ids": []
+    }
+  ],
+  "issues": {}
+}
