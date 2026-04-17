@@ -1,0 +1,98 @@
+{
+  "pr_number": 35,
+  "base_branch": "main",
+  "head_branch": "feature/code-review-2",
+  "created_at": "2026-04-17T23:35:18Z",
+  "last_updated": "2026-04-17T23:35:18Z",
+  "next_issue_id": 6,
+  "reviews": [
+    {
+      "round": 1,
+      "commit_sha": "ea2c1750202b94458c6f307be28a24a7d4017093",
+      "timestamp": "2026-04-17T23:35:18Z",
+      "type": "full",
+      "files_checked": 5,
+      "newly_fixed_ids": [],
+      "newly_found_ids": [
+        "issue-1",
+        "issue-2",
+        "issue-3",
+        "issue-4",
+        "issue-5"
+      ],
+      "regressed_ids": []
+    }
+  ],
+  "issues": {
+    "issue-1": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 5: TypeScript Strictness",
+      "scope": "frontend",
+      "path": "features/todos/components/TodoList.tsx",
+      "line": 4,
+      "description": "TodoListProps uses 'any[]' for the todos prop despite importing the Todo type on line 1. The Todo type is never used, and 'any' defeats compile-time type safety for all downstream access to todo properties.",
+      "suggestion": "Change 'todos: any[]' to 'todos: Todo[]' in the TodoListProps interface. The Todo import on line 1 already exists and matches the shape being consumed (.id, .title, .completed).",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 5: TypeScript Strictness**\n\nThe `TodoListProps` interface declares `todos: any[]` even though the `Todo` type is already imported on line 1 from `@/features/todos/types/todo`. This violates the \"Never use `any`\" rule. Using `any[]` silently disables all type checking on todo items throughout this component — misspelled property access (e.g., `todo.titl`) or incorrect assumptions about the data shape will not be caught at compile time. The `Todo` type is imported but completely unused, which confirms this was likely an oversight rather than an intentional decision.\n\n**Suggestion:** Change `todos: any[]` to `todos: Todo[]` in the `TodoListProps` interface. The import already exists, so the fix is a single-word change on line 4.\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-2": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 7: useSWR Best Practices",
+      "scope": "frontend",
+      "path": "pages/review-test-4.tsx",
+      "line": 15,
+      "description": "Page uses the forbidden useEffect + fetch + useState pattern for client-side data fetching instead of useSWR. This results in manual management of loading, error, and data states that useSWR handles automatically, and misses built-in caching, deduplication, and revalidation.",
+      "suggestion": "Replace the useEffect + fetch + useState pattern with a custom useSWR hook. Create a useTodos hook in features/todos/hooks/useTodos.ts that wraps useSWR<Todo[]>, then use it in this page or in a container component.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 7: useSWR Best Practices**\n\nThis page uses `useEffect` + `fetch` + three `useState` calls (lines 11-29) to fetch data from an external API. This is explicitly listed as a forbidden pattern in Cat 7: \"useEffect + fetch + useState for data fetching.\" The rule states that useSWR is mandatory for all client-side data fetching with no exceptions.\n\nThe manual approach has several concrete downsides compared to useSWR:\n- No request deduplication — if this component remounts, a duplicate request fires\n- No caching — navigating away and back triggers a fresh fetch every time\n- No automatic revalidation on window focus or reconnect\n- Manual loading/error state management that useSWR provides out of the box via `isLoading` and `error`\n- The `setIsLoading(false)` call is duplicated in both the success and error paths (lines 23, 27)\n\n**Suggestion:** Create a custom hook `useTodos` in `features/todos/hooks/useTodos.ts` that wraps `useSWR<Todo[]>('https://jsonplaceholder.typicode.com/todos')` with a typed return interface. Then replace the three `useState` hooks and the `useEffect` block in this page with a single `const { todos, isLoading, error } = useTodos()` call. This also aligns with the Container-Presentational pattern (Cat 1) by moving data fetching into a hook.\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-3": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 8: Error Handling",
+      "scope": "frontend",
+      "path": "pages/review-test-4.tsx",
+      "line": 35,
+      "description": "Loading state element is missing role='status' and aria-busy='true' attributes required by Cat 8 and Cat 13 for screen reader accessibility.",
+      "suggestion": "Add role='status' and aria-busy='true' to the loading paragraph: <p className='text-gray-500' role='status' aria-busy='true'>Loading todos...</p>",
+      "severity": "Recommended",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 8: Error Handling**\n\nThe loading indicator on line 35 (`<p className=\"text-gray-500\">Loading todos...</p>`) is missing `role=\"status\"` and `aria-busy=\"true\"`. Cat 8 and Cat 13 (Accessibility) both require these attributes on loading states so that screen readers announce the loading status to users who cannot see the visual indicator. Without `role=\"status\"`, assistive technology has no semantic signal that this element represents a live status update.\n\n**Suggestion:** Update to `<p className=\"text-gray-500\" role=\"status\" aria-busy=\"true\">Loading todos...</p>`\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-4": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 8: Error Handling",
+      "scope": "frontend",
+      "path": "pages/review-test-4.tsx",
+      "line": 37,
+      "description": "Error state element is missing role='alert' attribute required by Cat 8 and Cat 13 for screen reader announcement of error conditions.",
+      "suggestion": "Add role='alert' to the error paragraph: <p className='text-red-600' role='alert'>Error: {error}</p>",
+      "severity": "Recommended",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 8: Error Handling**\n\nThe error message on line 37 (`<p className=\"text-red-600\">Error: {error}</p>`) is missing `role=\"alert\"`. Cat 8 and Cat 13 (Accessibility) require `role=\"alert\"` on error states so that screen readers immediately announce the error to the user. Without this attribute, a user relying on assistive technology would not be notified that an error occurred — they would only see the absence of content with no explanation.\n\n**Suggestion:** Update to `<p className=\"text-red-600\" role=\"alert\">Error: {error}</p>`\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-5": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 5: TypeScript Strictness",
+      "scope": "frontend",
+      "path": "pages/review-test-4.tsx",
+      "line": 3,
+      "description": "Todo interface is defined inline in the page file (lines 3-8) instead of being imported from the shared type at features/todos/types/todo.ts. An identical Todo interface already exists there and is used by other components (e.g., TodoList.tsx).",
+      "suggestion": "Remove the inline Todo interface (lines 3-8) and add: import type { Todo } from '@/features/todos/types/todo'",
+      "severity": "Recommended",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 5: TypeScript Strictness**\n\nThe `Todo` interface is defined inline on lines 3-8 of this page file, but an identical `Todo` interface already exists at `features/todos/types/todo.ts` and is imported by other components (e.g., `features/todos/components/TodoList.tsx`). Cat 5 explicitly flags \"Shared types defined inside component files\" as a code smell and requires shared types to be exported from `types/`.\n\nHaving duplicate type definitions creates a maintenance risk: if the `Todo` shape changes (e.g., a new field is added), the inline copy here will be out of sync with the canonical type, leading to subtle type mismatches between this page and components that use the shared type.\n\n**Suggestion:** Delete the inline `Todo` interface (lines 3-8) and add `import type { Todo } from '@/features/todos/types/todo';` to the imports.\n\n<!-- pr-code-review-validator -->"
+    }
+  }
+}
