@@ -1,0 +1,53 @@
+{
+  "pr_number": 34,
+  "base_branch": "main",
+  "head_branch": "feature/code-review-2",
+  "created_at": "2026-04-17T23:28:12Z",
+  "last_updated": "2026-04-17T23:28:12Z",
+  "next_issue_id": 3,
+  "reviews": [
+    {
+      "round": 1,
+      "commit_sha": "def165f888aaab1b493919af9fe54b90bd17fbc0",
+      "timestamp": "2026-04-17T23:28:12Z",
+      "type": "full",
+      "files_checked": 4,
+      "newly_fixed_ids": [],
+      "newly_found_ids": [
+        "issue-1",
+        "issue-2"
+      ],
+      "regressed_ids": []
+    }
+  ],
+  "issues": {
+    "issue-1": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 5: TypeScript Strictness",
+      "scope": "frontend",
+      "path": "features/todos/components/TodoList.tsx",
+      "line": 4,
+      "description": "Props interface uses `any[]` instead of the imported `Todo[]` type. The `Todo` type is already imported on line 1 but is unused because the props interface declares `todos: any[]` instead of `todos: Todo[]`. This defeats TypeScript's static analysis, meaning any object shape could be passed to this component without compile-time errors.",
+      "suggestion": "Change `todos: any[]` to `todos: Todo[]` in the TodoListProps interface to use the already-imported `Todo` type.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": ""
+    },
+    "issue-2": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 7: useSWR Best Practices",
+      "scope": "frontend",
+      "path": "features/todos/hooks/useTodos.ts",
+      "line": 13,
+      "description": "useSWR is called with an external URL (`https://jsonplaceholder.typicode.com/todos`) as the key instead of an internal API route path. The skill's key convention rule states: \"Key convention: use the API route path (`/api/products`, `/api/products/${id}`).\" While the shared fetcher and global SWRConfig are already properly configured (lib/fetcher.ts and pages/_app.tsx), calling external APIs directly from the client bypasses any backend control over data transformation, error normalization, caching, and rate limiting.",
+      "suggestion": "Create an internal API route at `pages/api/todos/index.ts` that proxies the external API call, then change the SWR key from `'https://jsonplaceholder.typicode.com/todos'` to `'/api/todos'`. This keeps the external dependency behind the backend and follows the project's key convention pattern.",
+      "severity": "Recommended",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": ""
+    }
+  }
+}
