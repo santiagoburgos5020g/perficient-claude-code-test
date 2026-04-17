@@ -1,0 +1,85 @@
+{
+  "pr_number": 29,
+  "base_branch": "main",
+  "head_branch": "feature/code-review-refactor-1",
+  "created_at": "2026-04-17T20:35:02Z",
+  "last_updated": "2026-04-17T20:35:02Z",
+  "next_issue_id": 5,
+  "reviews": [
+    {
+      "round": 1,
+      "commit_sha": "6c513b2806eec6f580e2c713915e1cc3739b9023",
+      "timestamp": "2026-04-17T20:35:02Z",
+      "type": "full",
+      "files_checked": [
+        "pages/test-roda.tsx"
+      ],
+      "newly_found_ids": [
+        "issue-1",
+        "issue-2",
+        "issue-3",
+        "issue-4"
+      ],
+      "newly_fixed_ids": [],
+      "regressed_ids": []
+    }
+  ],
+  "issues": {
+    "issue-1": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 7: useSWR Best Practices",
+      "scope": "frontend",
+      "path": "pages/test-roda.tsx",
+      "line": 15,
+      "description": "Lines 11-29 use `useEffect` + `fetch` + three `useState` hooks to fetch todos from an external API. This is explicitly forbidden by the project's useSWR rules. The project already has the full useSWR infrastructure in place: `swr` is installed, a shared fetcher exists at `lib/fetcher.ts` with proper `FetchError` handling, and `SWRConfig` is configured in `pages/_app.tsx` with the global fetcher. By bypassing all of this, the component manually reimplements loading state, error state, and caching behavior that useSWR provides out of the box. This results in no automatic revalidation, no cache deduplication, no stale-while-revalidate behavior, and duplicated error/loading state management.",
+      "suggestion": "Create `hooks/useTodos.ts` with a custom hook that uses `useSWR<Todo[]>('https://jsonplaceholder.typicode.com/todos')` (the global fetcher from `SWRConfig` will be used automatically). The hook should define and export a `UseTodosReturn` interface and return `{ todos: data, isLoading, error, mutate }`. Move the `Todo` interface to `types/todo.ts`. Remove all `useEffect`, `useState`, and `fetch` calls from the page and consume the hook instead.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 7: useSWR Best Practices**\n\nLines 11-29 use `useEffect` + `fetch` + three `useState` hooks to fetch todos from an external API. This is explicitly forbidden by the project's useSWR rules. The project already has the full useSWR infrastructure in place: `swr` is installed, a shared fetcher exists at `lib/fetcher.ts` with proper `FetchError` handling, and `SWRConfig` is configured in `pages/_app.tsx` with the global fetcher. By bypassing all of this, the component manually reimplements loading state, error state, and caching behavior that useSWR provides out of the box. This results in no automatic revalidation, no cache deduplication, no stale-while-revalidate behavior, and duplicated error/loading state management.\n\n**Suggestion:** Create `hooks/useTodos.ts` with a custom hook that uses `useSWR<Todo[]>('https://jsonplaceholder.typicode.com/todos')` (the global fetcher from `SWRConfig` will be used automatically). The hook should define and export a `UseTodosReturn` interface and return `{ todos: data, isLoading, error, mutate }`. Move the `Todo` interface to `types/todo.ts`. Remove all `useEffect`, `useState`, and `fetch` calls from the page and consume the hook instead.\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-2": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 6: React 18 Hooks Best Practices",
+      "scope": "frontend",
+      "path": "pages/test-roda.tsx",
+      "line": 15,
+      "description": "`useEffect` on line 15 is used for data fetching, which is a forbidden pattern per Cat 6. The hook decision table explicitly states that `useEffect` must not be used for data fetching -- only for syncing with external systems (e.g., subscriptions, DOM manipulation). Using `useEffect` for data fetching leads to request waterfalls, missing race condition handling, no caching, and requires manual cleanup that useSWR handles automatically. This violation is the root cause that also triggers the Cat 7 violation.",
+      "suggestion": "Replace the `useEffect` + `fetch` + `useState` pattern entirely with a custom useSWR hook (see Cat 7 suggestion). The `useEffect` call, along with the three `useState` declarations for `todos`, `isLoading`, and `error`, should all be removed.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 6: React 18 Hooks Best Practices**\n\n`useEffect` on line 15 is used for data fetching, which is a forbidden pattern per Cat 6. The hook decision table explicitly states that `useEffect` must not be used for data fetching -- only for syncing with external systems (e.g., subscriptions, DOM manipulation). Using `useEffect` for data fetching leads to request waterfalls, missing race condition handling, no caching, and requires manual cleanup that useSWR handles automatically. This violation is the root cause that also triggers the Cat 7 violation.\n\n**Suggestion:** Replace the `useEffect` + `fetch` + `useState` pattern entirely with a custom useSWR hook (see Cat 7 suggestion). The `useEffect` call, along with the three `useState` declarations for `todos`, `isLoading`, and `error`, should all be removed.\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-3": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 1: Container-Presentational Component Pattern",
+      "scope": "frontend",
+      "path": "pages/test-roda.tsx",
+      "line": 10,
+      "description": "The `TestRodaPage` component mixes data fetching logic (lines 11-29) with non-trivial rendering logic (lines 31-58, including conditional loading/error/success states and a mapped list with styled items). While pages in `pages/` are allowed to act as top-level containers, the skill requires that containers compose presentational children rather than containing significant JSX themselves. The rendering here includes three conditional branches and a mapped list with multiple styled elements -- this is beyond minimal composition JSX.",
+      "suggestion": "After extracting the `useTodos` hook, create a presentational `components/TodoList/TodoList.tsx` that accepts `{ todos: Todo[] }` as props and renders the `<ul>` with its list items. The page should handle the loading/error/empty states and delegate the list rendering to the presentational component: `<TodoList todos={todos} />`.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 1: Container-Presentational Component Pattern**\n\nThe `TestRodaPage` component mixes data fetching logic (lines 11-29) with non-trivial rendering logic (lines 31-58, including conditional loading/error/success states and a mapped list with styled items). While pages in `pages/` are allowed to act as top-level containers, the skill requires that containers compose presentational children rather than containing significant JSX themselves. The rendering here includes three conditional branches and a mapped list with multiple styled elements -- this is beyond minimal composition JSX.\n\nOnce the data fetching is extracted into a custom hook (per Cat 7), the page should compose a presentational `TodoList` component rather than rendering the list inline. This separation would make the list rendering independently testable and reusable.\n\n**Suggestion:** After extracting the `useTodos` hook, create a presentational `components/TodoList/TodoList.tsx` that accepts `{ todos: Todo[] }` as props and renders the `<ul>` with its list items. The page should handle the loading/error/empty states and delegate the list rendering to the presentational component: `<TodoList todos={todos} />`.\n\n<!-- pr-code-review-validator -->"
+    },
+    "issue-4": {
+      "skill": "nextjs-react-best-practices",
+      "rule": "Cat 13: Accessibility (a11y)",
+      "scope": "frontend",
+      "path": "pages/test-roda.tsx",
+      "line": 47,
+      "description": "The completion status of each todo is communicated through visual-only cues: a `✓` or `○` symbol (line 48-49) combined with color coding (`text-green-600` vs `text-yellow-600`) and a `line-through` text decoration (line 50). Screen readers may announce these Unicode symbols inconsistently across platforms, and the color/strikethrough styling is invisible to assistive technology. Users relying on screen readers cannot reliably determine whether a todo is completed or incomplete.",
+      "suggestion": "Add an `aria-label` to the status `<span>` to explicitly communicate the state: `<span aria-label={todo.completed ? 'Completed' : 'Incomplete'} className=\"...\">`. Alternatively, add visually hidden text using a Tailwind `sr-only` class: `<span className=\"sr-only\">{todo.completed ? 'Completed' : 'Incomplete'}</span>` adjacent to the symbol.",
+      "severity": "Critical",
+      "status": "open",
+      "found_in_round": 1,
+      "resolved_in_round": null,
+      "inline_comment_body": "**nextjs-react-best-practices > Cat 13: Accessibility (a11y)**\n\nThe completion status of each todo is communicated through visual-only cues: a `✓` or `○` symbol (line 48-49) combined with color coding (`text-green-600` vs `text-yellow-600`) and a `line-through` text decoration (line 50). Screen readers may announce these Unicode symbols inconsistently across platforms, and the color/strikethrough styling is invisible to assistive technology. Users relying on screen readers cannot reliably determine whether a todo is completed or incomplete.\n\n**Suggestion:** Add an `aria-label` to the status `<span>` to explicitly communicate the state: `<span aria-label={todo.completed ? 'Completed' : 'Incomplete'} className=\"...\">`. Alternatively, add visually hidden text using a Tailwind `sr-only` class: `<span className=\"sr-only\">{todo.completed ? 'Completed' : 'Incomplete'}</span>` adjacent to the symbol.\n\n<!-- pr-code-review-validator -->"
+    }
+  }
+}
