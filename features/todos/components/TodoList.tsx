@@ -1,7 +1,7 @@
 import type { Todo } from '@/features/todos/types/todo';
 
 interface TodoListProps {
-  todos: Todo[];
+  todos: any[];
 }
 
 export default function TodoList({ todos }: TodoListProps) {
