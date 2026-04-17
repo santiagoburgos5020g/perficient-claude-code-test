@@ -80,9 +80,9 @@ PRIOR_BODY=$(echo "$PRIOR_REVIEW" | jq -r '.body // empty')
 echo "Found prior review #${PRIOR_REVIEW_ID}"
 
 # ---------------------------------------------------------------------------
-# 5. Check if prior review had violations (VIOLATIONS FOUND in body)
+# 5. Check if prior review had violations (any violation indicator in body)
 # ---------------------------------------------------------------------------
-if [[ "$PRIOR_BODY" != *"VIOLATIONS FOUND"* ]]; then
+if [[ "$PRIOR_BODY" != *"VIOLATIONS"* ]]; then
   set_full_mode "prior review did not contain violations (was pass/skip)"
   exit 0
 fi
@@ -112,9 +112,65 @@ PRIOR_VIOLATIONS=$(echo "$REVIEW_COMMENTS" | jq -c --arg marker "$MARKER" '[
 PRIOR_COUNT=$(echo "$PRIOR_VIOLATIONS" | jq 'length')
 echo "Found ${PRIOR_COUNT} prior inline violations"
 
+# ---------------------------------------------------------------------------
+# 6b. Fallback: parse violations from review body if no inline comments
+# ---------------------------------------------------------------------------
 if [[ "$PRIOR_COUNT" -eq 0 ]]; then
-  set_full_mode "prior review had no parseable inline comments"
-  exit 0
+  echo "No inline comments found. Attempting to parse violations from review body..."
+
+  # Extract violation lines matching: - [ ] **Rule/Cat ...** — `path:line` — description
+  # Also handles: - [ ] **skill > rule** -- `path:line` -- description
+  BODY_VIOLATIONS=$(echo "$PRIOR_BODY" | grep -oP '- \[ \] \*\*(?<rule>[^*]+)\*\*\s*[—–-]+\s*`(?<path>[^:]+):(?<line>\d+)`' | head -50 || true)
+
+  if [[ -z "$BODY_VIOLATIONS" ]]; then
+    set_full_mode "prior review had no parseable inline comments or body violations"
+    exit 0
+  fi
+
+  # Parse each body violation line into JSON
+  PRIOR_VIOLATIONS=$(echo "$PRIOR_BODY" | python3 -c "
+import sys, json, re
+
+body = sys.stdin.read()
+pattern = r'- \[ \] \*\*([^*]+)\*\*\s*[—–-]+\s*\x60([^:]+):(\d+)\x60\s*[—–-]+\s*(.*)'
+violations = []
+for m in re.finditer(pattern, body):
+    rule_text = m.group(1).strip()
+    path = m.group(2).strip()
+    line = int(m.group(3))
+    desc = m.group(4).strip()
+    # Determine skill from rule text
+    if '>' in rule_text:
+        parts = rule_text.split('>', 1)
+        skill = parts[0].strip()
+        rule = parts[1].strip()
+    elif rule_text.startswith('Rule'):
+        skill = 'backend-best-practices'
+        rule = rule_text
+    elif rule_text.startswith('Cat'):
+        skill = 'nextjs-react-best-practices'
+        rule = rule_text
+    else:
+        skill = 'unknown'
+        rule = rule_text
+    violations.append({
+        'path': path,
+        'line': line,
+        'side': 'RIGHT',
+        'body': f'**{skill} > {rule}**\n\n{desc}\n\n<!-- pr-code-review-validator -->',
+        'skill': skill,
+        'rule': rule
+    })
+print(json.dumps(violations))
+" 2>/dev/null) || PRIOR_VIOLATIONS="[]"
+
+  PRIOR_COUNT=$(echo "$PRIOR_VIOLATIONS" | jq 'length')
+  echo "Parsed ${PRIOR_COUNT} violations from review body"
+
+  if [[ "$PRIOR_COUNT" -eq 0 ]]; then
+    set_full_mode "could not parse violations from review body"
+    exit 0
+  fi
 fi
 
 # ---------------------------------------------------------------------------
