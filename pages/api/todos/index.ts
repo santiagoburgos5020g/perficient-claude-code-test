@@ -6,17 +6,7 @@ import { paginationSchema } from '@/lib/schemas/pagination';
 
 export default withApiHandler(
   async (req: NextApiRequest, res: NextApiResponse<ApiEnvelope>) => {
-    const parsed = paginationSchema.safeParse(req.query);
-    if (!parsed.success) {
-      return res.status(400).json({
-        success: false,
-        data: null,
-        error: parsed.error.issues.map((i) => i.message).join('; '),
-        meta: null,
-      });
-    }
-
-    const { page, limit } = parsed.data;
+    const { page, limit } = req.query as unknown as z.infer<typeof paginationSchema>;
 
     const baseUrl = process.env.TODOS_API_URL;
     if (!baseUrl) {
@@ -68,5 +58,5 @@ export default withApiHandler(
       },
     });
   },
-  { allowedMethods: ['GET'] }
+  { allowedMethods: ['GET'], querySchema: paginationSchema }
 );

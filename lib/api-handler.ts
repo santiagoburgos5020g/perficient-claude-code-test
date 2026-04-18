@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import type { ZodSchema } from 'zod';
 
 export interface ApiEnvelope<T = unknown> {
   success: boolean;
@@ -9,6 +10,7 @@ export interface ApiEnvelope<T = unknown> {
 
 interface ApiHandlerOptions {
   allowedMethods: string[];
+  querySchema?: ZodSchema;
 }
 
 type ApiRouteHandler = (
@@ -29,6 +31,19 @@ export function withApiHandler(
         error: `Method not allowed: ${req.method} is not supported`,
         meta: null,
       });
+    }
+
+    if (options.querySchema) {
+      const parsed = options.querySchema.safeParse(req.query);
+      if (!parsed.success) {
+        return res.status(400).json({
+          success: false,
+          data: null,
+          error: parsed.error.issues.map((i: { message: string }) => i.message).join('; '),
+          meta: null,
+        });
+      }
+      req.query = parsed.data;
     }
 
     try {

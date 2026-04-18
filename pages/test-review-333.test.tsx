@@ -11,6 +11,7 @@ function createMockReturn(overrides: Partial<ReturnType<typeof useTodos>> = {}) 
     todos: [],
     isLoading: false,
     error: null,
+    mutate: jest.fn(),
     ...overrides,
   };
 }
