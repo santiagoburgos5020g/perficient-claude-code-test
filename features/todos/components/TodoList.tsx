@@ -14,7 +14,6 @@ export default function TodoList({ todos }: TodoListProps) {
               type="checkbox"
               checked={todo.completed}
               readOnly
-              aria-label={todo.title}
             />
             <span className={todo.completed ? 'line-through text-gray-400' : ''}>
               {todo.title}
