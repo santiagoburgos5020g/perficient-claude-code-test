@@ -518,6 +518,7 @@ if [[ "${REVIEW_MODE:-full}" == "incremental" ]] && [[ -f prior-findings.json ]]
 
   CARRIED_FORWARD_JSON=$(jq -c '.carried_forward_violations' prior-findings.json)
   TOUCHED_FILES_LIST=$(jq -r '.touched_violation_files | join(", ")' prior-findings.json)
+  TOUCHED_VIOLATIONS_JSON=$(jq -c '.touched_violations // []' prior-findings.json)
   NEW_FILES_LIST=$(jq -r '.new_paths | join(", ")' prior-findings.json)
   CARRIED_COUNT=$(jq '.carried_forward_violations | length' prior-findings.json)
 
@@ -537,6 +538,9 @@ Include them as-is in the final inline_comments array.
 FILES REQUIRING RE-VALIDATION (prior violations existed, file was modified):
 ${TOUCHED_FILES_LIST}
 
+PRIOR VIOLATIONS ON THOSE TOUCHED FILES (use this to determine resolved vs new):
+${TOUCHED_VIOLATIONS_JSON}
+
 NEW FILES TO VALIDATE (no prior violations, newly changed):
 ${NEW_FILES_LIST}
 
@@ -550,6 +554,21 @@ INSTRUCTIONS FOR INCREMENTAL MODE:
   b. Confirmed violations from re-validation of touched files
   c. Confirmed violations from new file validation
 - The verdict is "fail" if ANY violations remain (carried + confirmed), "pass" if zero.
+
+CRITICAL — CLASSIFYING RE-VALIDATED FINDINGS:
+Use the PRIOR VIOLATIONS list above to determine the correct category for each
+finding on re-validated files:
+  - "Resolved" = a violation that existed in PRIOR VIOLATIONS (same skill+rule+path)
+    and is NO LONGER found after re-validation. Show as checked/strikethrough.
+  - "New finding on re-validated file" = a violation found NOW that does NOT match
+    any entry in PRIOR VIOLATIONS (different skill or rule). This is a NEW violation,
+    not a resolved one. Show as unchecked in "Re-validated" section.
+  - "Still present" = a violation that existed in PRIOR VIOLATIONS AND is still
+    found after re-validation. Show as unchecked in "Re-validated" section.
+Do NOT guess — compare each finding against the PRIOR VIOLATIONS list by skill
+and rule name. If a finding's skill+rule combination does not appear in PRIOR
+VIOLATIONS for that file, it is a NEW finding, not a resolved prior violation.
+
 - The summary MUST indicate this is an incremental review. Use this format in the
   summary body (after the metrics table):
 
@@ -557,8 +576,9 @@ INSTRUCTIONS FOR INCREMENTAL MODE:
   <list each carried-forward violation as: - [ ] **<rule>** -- \`<path>:<line>\` -- <description>>
 
   ### Re-validated
-  <for files that were re-validated, list resolved as: - [x] ~~**<rule>** -- \`<path>:<line>\`~~ -- **Resolved**>
-  <for new violations on re-validated files: - [ ] **<rule>** -- \`<path>:<line>\` -- <description>>
+  <for prior violations that are resolved: - [x] ~~**<rule>** -- \`<path>:<line>\`~~ -- **Resolved**>
+  <for prior violations still present: - [ ] **<rule>** -- \`<path>:<line>\` -- <description> (still present)>
+  <for NEW violations on re-validated files: - [ ] **<rule>** -- \`<path>:<line>\` -- <description>>
 
   ### New findings
   <list new violations from new files as: - [ ] **<rule>** -- \`<path>:<line>\` -- <description>>

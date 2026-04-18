@@ -178,6 +178,11 @@ CARRIED_FORWARD=$(echo "$PRIOR_VIOLATIONS" | jq -c --argjson untouched "$UNTOUCH
   [.[] | select(.path as $p | $untouched | index($p) != null)]
 ')
 
+# touched_violations = prior violations on files that WERE modified (for cross-reference)
+TOUCHED_VIOLATIONS=$(echo "$PRIOR_VIOLATIONS" | jq -c --argjson touched "$TOUCHED_VIOLATION_FILES" '
+  [.[] | select(.path as $p | $touched | index($p) != null)]
+')
+
 # files_to_validate = touched violation files + new paths
 FILES_TO_VALIDATE=$(jq -n \
   --argjson touched "$TOUCHED_VIOLATION_FILES" \
@@ -217,6 +222,7 @@ jq -n \
   --argjson untouched_violation_files "$UNTOUCHED_VIOLATION_FILES" \
   --argjson new_paths "$NEW_PATHS" \
   --argjson carried_forward_violations "$CARRIED_FORWARD" \
+  --argjson touched_violations "$TOUCHED_VIOLATIONS" \
   --argjson files_to_validate "$FILES_TO_VALIDATE" \
   '{
     review_mode: $review_mode,
@@ -228,6 +234,7 @@ jq -n \
     untouched_violation_files: $untouched_violation_files,
     new_paths: $new_paths,
     carried_forward_violations: $carried_forward_violations,
+    touched_violations: $touched_violations,
     files_to_validate: $files_to_validate
   }' > prior-findings.json
 
