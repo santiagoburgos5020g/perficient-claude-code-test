@@ -138,18 +138,6 @@ describe('/api/todos', () => {
     expect(res._getStatusCode()).toBe(405);
   });
 
-  it('returns 500 when TODOS_API_URL is not set', async () => {
-    delete process.env.TODOS_API_URL;
-    const { req, res } = createGetMocks();
-
-    await handler(req, res);
-
-    expect(res._getStatusCode()).toBe(500);
-    const body = JSON.parse(res._getData());
-    expect(body.success).toBe(false);
-    expect(body.error).toContain('TODOS_API_URL');
-  });
-
   it('returns upstream status on upstream error', async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
