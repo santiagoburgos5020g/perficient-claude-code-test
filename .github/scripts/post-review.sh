@@ -251,5 +251,28 @@ if (( EXIT_CODE == 0 )); then
   bash "$(dirname "$0")/cleanup-prior-reviews.sh" 2>/dev/null || true
 fi
 
+# ---------------------------------------------------------------------------
+# 6. Write the violations artifact for the next run
+# ---------------------------------------------------------------------------
+ARTIFACT_FILE="${ARTIFACT_PATH:-.review-artifacts/violations.json}"
+mkdir -p "$(dirname "$ARTIFACT_FILE")"
+
+if [[ -f "$OUTPUT_FILE" ]] && jq -e '.violations_artifact' "$OUTPUT_FILE" >/dev/null 2>&1; then
+  jq '.violations_artifact' "$OUTPUT_FILE" > "$ARTIFACT_FILE"
+  ARTIFACT_COUNT=$(jq '.active_violations | length' "$ARTIFACT_FILE")
+  echo "Violations artifact written: ${ARTIFACT_COUNT} active violations"
+else
+  jq -n \
+    --argjson pr "${PR_NUMBER}" \
+    --arg sha "$(git rev-parse HEAD)" \
+    '{
+      pr_number: ($pr | tonumber),
+      last_push_sha: $sha,
+      push_count: 1,
+      active_violations: []
+    }' > "$ARTIFACT_FILE"
+  echo "Violations artifact written: 0 active violations (fallback)"
+fi
+
 echo "Review posted. Exit code: ${EXIT_CODE}"
 exit "$EXIT_CODE"

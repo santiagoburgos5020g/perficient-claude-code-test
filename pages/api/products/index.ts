@@ -1,39 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
-import type { ProductsApiResponse, ProductsApiError } from '@/features/products/types/product';
+import prisma from '@/lib/prisma';
+import { withApiHandler, type ApiEnvelope } from '@/lib/api-handler';
+import { paginationSchema } from '@/lib/schemas/pagination';
+import type { z } from 'zod';
 
-const prisma = new PrismaClient();
+export default withApiHandler(
+  async (req: NextApiRequest, res: NextApiResponse<ApiEnvelope>) => {
+    const { page, limit } = req.query as unknown as z.infer<typeof paginationSchema>;
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse<ProductsApiResponse | ProductsApiError>
-) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
-    return res.status(405).json({ error: 'Method not allowed', message: `${req.method} is not supported` });
-  }
-
-  const pageParam = req.query.page;
-  const limitParam = req.query.limit;
-
-  const page = pageParam === undefined ? 1 : Number(pageParam);
-  const limit = limitParam === undefined ? 30 : Number(limitParam);
-
-  if (!Number.isInteger(page) || page < 1) {
-    return res.status(400).json({
-      error: 'Invalid parameters',
-      message: 'page must be a positive integer',
-    });
-  }
-
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    return res.status(400).json({
-      error: 'Invalid parameters',
-      message: 'limit must be an integer between 1 and 100',
-    });
-  }
-
-  try {
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         skip: (page - 1) * limit,
@@ -51,23 +25,24 @@ export default async function handler(
     ]);
 
     const totalPages = Math.ceil(total / limit);
-    const hasMore = page < totalPages;
+
+    const serializedProducts = products.map((p) => ({
+      ...p,
+      price: Number(p.price),
+    }));
 
     return res.status(200).json({
-      products,
-      pagination: {
+      success: true,
+      data: { products: serializedProducts },
+      error: null,
+      meta: {
         page,
         limit,
         total,
         totalPages,
-        hasMore,
+        hasMore: page < totalPages,
       },
     });
-  } catch (error) {
-    console.error('Failed to fetch products:', error);
-    return res.status(500).json({
-      error: 'Failed to fetch products',
-      message: 'Internal server error',
-    });
-  }
-}
+  },
+  { allowedMethods: ['GET'], querySchema: paginationSchema }
+);
