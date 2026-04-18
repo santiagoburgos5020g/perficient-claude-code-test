@@ -14,11 +14,12 @@ describe('TodoList', () => {
     expect(screen.getByText('Walk the dog')).toBeInTheDocument();
   });
 
-  it('renders checkboxes reflecting completed state', () => {
+  it('renders checkboxes with explicit label associations', () => {
     render(<TodoList todos={mockTodos} />);
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes[0]).not.toBeChecked();
-    expect(checkboxes[1]).toBeChecked();
+    const checkbox1 = screen.getByLabelText('Buy groceries');
+    const checkbox2 = screen.getByLabelText('Walk the dog');
+    expect(checkbox1).not.toBeChecked();
+    expect(checkbox2).toBeChecked();
   });
 
   it('applies line-through styling to completed todos', () => {

@@ -46,7 +46,12 @@ describe('useTodos', () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       status: 200,
-      json: async () => ({ todos: mockTodos }),
+      json: async () => ({
+        success: true,
+        data: { todos: mockTodos },
+        error: null,
+        meta: { page: 1, limit: 20, total: 1, totalPages: 1, hasMore: false },
+      }),
     }) as jest.Mock;
 
     const { result } = renderHook(() => useTodos(), { wrapper: createWrapper() });

@@ -9,8 +9,9 @@ export default function TodoList({ todos }: TodoListProps) {
     <ul className="space-y-2">
       {todos.map((todo) => (
         <li key={todo.id} className="flex items-center gap-2">
-          <label className="flex items-center gap-2">
+          <label htmlFor={`todo-${todo.id}`} className="flex items-center gap-2">
             <input
+              id={`todo-${todo.id}`}
               type="checkbox"
               checked={todo.completed}
               readOnly
