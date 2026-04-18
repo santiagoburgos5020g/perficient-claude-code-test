@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import type { Todo } from '@/types/todo';
-import { withApiHandler } from '@/lib/withApiHandler';
+import { withApiHandler } from '@/lib/with-api-handler';
 
 async function handler(req: NextApiRequest, res: NextApiResponse) {
-  const response = await fetch('https://jsonplaceholder.typicode.com/todos');
+  const response = await fetch(process.env.TODOS_API_URL!);
   if (!response.ok) {
     return res.status(502).json({
       success: false,

@@ -4,6 +4,10 @@ import handler from './index';
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
+beforeAll(() => {
+  process.env.TODOS_API_URL = 'https://jsonplaceholder.typicode.com/todos';
+});
+
 function createMocks(method: string) {
   const req = {
     method,

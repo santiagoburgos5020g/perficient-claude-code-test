@@ -1,6 +1,6 @@
 import useSWR, { type KeyedMutator } from 'swr';
 import type { Todo } from '@/types/todo';
-import type { ApiResponse } from '@/lib/withApiHandler';
+import type { ApiResponse } from '@/lib/with-api-handler';
 
 interface UseTodosReturn {
   todos: Todo[];
