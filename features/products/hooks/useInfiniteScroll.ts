@@ -1,65 +1,57 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
+import useSWRInfinite from 'swr/infinite';
 import type { Product } from '@/features/products/types/product';
 import type { ApiEnvelope } from '@/lib/api-handler';
 
-export function useInfiniteScroll() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [page, setPage] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hasMore, setHasMore] = useState(true);
+type ProductsEnvelope = ApiEnvelope<{ products: Product[] }>;
 
-  const loadingRef = useRef(false);
+interface UseInfiniteScrollReturn {
+  products: Product[];
+  isLoading: boolean;
+  isInitialLoading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  sentinelRef: React.RefObject<HTMLDivElement>;
+  retry: () => void;
+}
+
+const PAGE_LIMIT = 30;
+
+function getKey(pageIndex: number, previousPageData: ProductsEnvelope | null): string | null {
+  if (previousPageData && !(previousPageData.meta as { hasMore?: boolean })?.hasMore) {
+    return null;
+  }
+  return `/api/products?page=${pageIndex + 1}&limit=${PAGE_LIMIT}`;
+}
+
+export function useInfiniteScroll(): UseInfiniteScrollReturn {
+  const { data, error, size, setSize, isLoading, isValidating, mutate } =
+    useSWRInfinite<ProductsEnvelope>(getKey);
+
   const sentinelRef = useRef<HTMLDivElement>(null);
   const observerRef = useRef<IntersectionObserver | null>(null);
-  const pageRef = useRef(page);
 
-  pageRef.current = page;
+  const products = data
+    ? data.flatMap((envelope) => envelope.data?.products ?? [])
+    : [];
 
-  const fetchProducts = useCallback(async () => {
-    if (loadingRef.current) return;
+  const hasMore = data
+    ? (data[data.length - 1]?.meta as { hasMore?: boolean })?.hasMore ?? false
+    : true;
 
-    loadingRef.current = true;
-    setIsLoading(true);
-    setError(null);
+  const isInitialLoading = !data && !error;
+  const isLoadingMore = isLoading || (size > 0 && data && typeof data[size - 1] === 'undefined');
 
-    try {
-      const currentPage = pageRef.current;
-      const response = await fetch(`/api/products?page=${currentPage}&limit=30`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}`);
-      }
-
-      const envelope: ApiEnvelope<{ products: Product[] }> = await response.json();
-
-      setProducts((prev) => [...prev, ...(envelope.data?.products ?? [])]);
-      setHasMore((envelope.meta as { hasMore?: boolean })?.hasMore ?? false);
-      setPage((prev) => prev + 1);
-
-      if (currentPage === 1) {
-        setIsInitialLoading(false);
-      }
-    } catch {
-      const currentPage = pageRef.current;
-      if (currentPage === 1) {
-        setError('Failed to load products. Please try again.');
-        setIsInitialLoading(false);
-      } else {
-        setError('Failed to load more products.');
-      }
-    } finally {
-      loadingRef.current = false;
-      setIsLoading(false);
+  const loadMore = useCallback(() => {
+    if (!isValidating && hasMore) {
+      setSize((s) => s + 1);
     }
-  }, []);
+  }, [isValidating, hasMore, setSize]);
 
   const retry = useCallback(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+    mutate();
+  }, [mutate]);
 
-  // Set up IntersectionObserver
   useEffect(() => {
     if (!hasMore) {
       if (observerRef.current) {
@@ -71,8 +63,8 @@ export function useInfiniteScroll() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !loadingRef.current) {
-          fetchProducts();
+        if (entries[0].isIntersecting) {
+          loadMore();
         }
       },
       { threshold: 0.1 }
@@ -87,13 +79,13 @@ export function useInfiniteScroll() {
     return () => {
       observer.disconnect();
     };
-  }, [hasMore, fetchProducts, page]);
+  }, [hasMore, loadMore]);
 
   return {
     products,
-    isLoading,
+    isLoading: isLoadingMore ?? false,
     isInitialLoading,
-    error,
+    error: error ? (error as Error).message : null,
     hasMore,
     sentinelRef,
     retry,

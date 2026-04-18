@@ -1,7 +1,7 @@
 import { useTodos } from '@/features/todos/hooks/useTodos';
 import TodoList from '@/features/todos/components/TodoList';
 
-export default function TestReview333Page() {
+export default function TodosPage() {
   const { todos, isLoading, error } = useTodos();
 
   return (
