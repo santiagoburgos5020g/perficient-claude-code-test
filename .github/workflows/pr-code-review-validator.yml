@@ -3,7 +3,7 @@ name: PR Code Review Validator
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
 
 concurrency:
   group: pr-review-${{ github.event.pull_request.number }}
@@ -11,18 +11,29 @@ concurrency:
 
 jobs:
   review:
-    if: ${{ !github.event.pull_request.draft }}
+    if: >-
+      ${{ !github.event.pull_request.draft &&
+          (github.event.action != 'labeled' || github.event.label.name == 'full-review') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write
+      actions: read
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Download prior violations artifact
+        id: download-artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-violations
+          path: .review-artifacts/
+        continue-on-error: true
 
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
@@ -36,6 +47,8 @@ jobs:
           EVENT_ACTION: ${{ github.event.action }}
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.event.after }}
+          FULL_REVIEW_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'full-review') }}
+          ARTIFACT_PATH: .review-artifacts/violations.json
         run: bash .github/scripts/detect-review-mode.sh
 
       - name: Clean up prior reviews
@@ -56,6 +69,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
+          ARTIFACT_PATH: .review-artifacts/violations.json
         run: bash .github/scripts/run-review-pipeline.sh
 
       - name: Post review to PR
@@ -66,4 +80,14 @@ jobs:
           REPO: ${{ github.repository }}
           PIPELINE_OUTCOME: ${{ steps.pipeline.outcome }}
           REVIEW_MODE: ${{ steps.detect.outputs.review_mode }}
+          ARTIFACT_PATH: .review-artifacts/violations.json
         run: bash .github/scripts/post-review.sh
+
+      - name: Upload violations artifact
+        if: always() && steps.pipeline.outcome != 'cancelled'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-${{ github.event.pull_request.number }}-violations
+          path: .review-artifacts/violations.json
+          overwrite: true
+          retention-days: 90
