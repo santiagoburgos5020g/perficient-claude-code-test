@@ -10,7 +10,7 @@ interface UseTodosReturn {
 
 export function useTodos(): UseTodosReturn {
   const { data, error, isLoading, mutate } = useSWR<Todo[]>(
-    'https://jsonplaceholder.typicode.com/todos'
+    '/api/todos'
   );
 
   return {
