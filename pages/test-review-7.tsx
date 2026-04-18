@@ -1,5 +1,5 @@
-import { useTodos } from '@/features/todos/hooks/useTodos';
-import TodoList from '@/features/todos/components/TodoList';
+import { useTodos } from '@/hooks/useTodos';
+import TodoList from '@/components/TodoList/TodoList';
 
 export default function TestReview7Page() {
   const { todos, isLoading, error } = useTodos();

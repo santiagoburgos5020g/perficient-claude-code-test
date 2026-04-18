@@ -1,5 +1,5 @@
 import useSWR, { type KeyedMutator } from 'swr';
-import type { Todo } from '@/features/todos/types/todo';
+import type { Todo } from '@/types/todo';
 
 interface UseTodosReturn {
   todos: Todo[];
@@ -16,7 +16,7 @@ export function useTodos(): UseTodosReturn {
   return {
     todos: data ?? [],
     isLoading,
-    error: error ? (error as Error).message : null,
+    error: error instanceof Error ? error.message : null,
     mutate,
   };
 }
