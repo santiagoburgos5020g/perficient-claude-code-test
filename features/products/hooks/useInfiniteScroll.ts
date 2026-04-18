@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Product, ProductsApiResponse } from '@/features/products/types/product';
+import type { Product } from '@/features/products/types/product';
+import type { ApiEnvelope } from '@/lib/api-handler';
 
 export function useInfiniteScroll() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -31,10 +32,10 @@ export function useInfiniteScroll() {
         throw new Error(`HTTP error ${response.status}`);
       }
 
-      const data: ProductsApiResponse = await response.json();
+      const envelope: ApiEnvelope<{ products: Product[] }> = await response.json();
 
-      setProducts((prev) => [...prev, ...data.products]);
-      setHasMore(data.pagination.hasMore);
+      setProducts((prev) => [...prev, ...(envelope.data?.products ?? [])]);
+      setHasMore((envelope.meta as { hasMore?: boolean })?.hasMore ?? false);
       setPage((prev) => prev + 1);
 
       if (currentPage === 1) {
