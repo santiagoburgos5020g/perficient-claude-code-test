@@ -14,7 +14,8 @@ export default function TodoList({ todos }: TodoListProps) {
               id={`todo-${todo.id}`}
               type="checkbox"
               checked={todo.completed}
-              readOnly
+              disabled
+              className="accent-current opacity-100"
             />
             <span className={todo.completed ? 'line-through text-gray-400' : ''}>
               {todo.title}
