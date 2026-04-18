@@ -1,32 +1,22 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { z } from 'zod';
 import { withApiHandler, type ApiEnvelope } from '@/lib/api-handler';
-import type { Todo } from '@/features/todos/types/todo';
+import { todoSchema } from '@/features/todos/types/todo';
+import { paginationSchema } from '@/lib/schemas/pagination';
 
 export default withApiHandler(
   async (req: NextApiRequest, res: NextApiResponse<ApiEnvelope>) => {
-    const pageParam = req.query.page;
-    const limitParam = req.query.limit;
-
-    const page = pageParam === undefined ? 1 : Number(pageParam);
-    const limit = limitParam === undefined ? 20 : Number(limitParam);
-
-    if (!Number.isInteger(page) || page < 1) {
+    const parsed = paginationSchema.safeParse(req.query);
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
         data: null,
-        error: 'page must be a positive integer',
+        error: parsed.error.issues.map((i) => i.message).join('; '),
         meta: null,
       });
     }
 
-    if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-      return res.status(400).json({
-        success: false,
-        data: null,
-        error: 'limit must be an integer between 1 and 100',
-        meta: null,
-      });
-    }
+    const { page, limit } = parsed.data;
 
     const baseUrl = process.env.TODOS_API_URL;
     if (!baseUrl) {
@@ -50,13 +40,24 @@ export default withApiHandler(
       });
     }
 
-    const todos: Todo[] = await response.json();
+    const rawData = await response.json();
+    const todosResult = z.array(todoSchema).safeParse(rawData);
+
+    if (!todosResult.success) {
+      return res.status(502).json({
+        success: false,
+        data: null,
+        error: 'Upstream response did not match expected schema',
+        meta: null,
+      });
+    }
+
     const total = Number(response.headers.get('x-total-count') ?? 0);
     const totalPages = Math.ceil(total / limit);
 
     return res.status(200).json({
       success: true,
-      data: { todos },
+      data: { todos: todosResult.data },
       error: null,
       meta: {
         page,
