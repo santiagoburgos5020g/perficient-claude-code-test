@@ -1,20 +1,21 @@
 import useSWR, { type KeyedMutator } from 'swr';
 import type { Todo } from '@/types/todo';
+import type { ApiResponse } from '@/lib/withApiHandler';
 
 interface UseTodosReturn {
   todos: Todo[];
   isLoading: boolean;
   error: string | null;
-  mutate: KeyedMutator<Todo[]>;
+  mutate: KeyedMutator<ApiResponse<Todo[]>>;
 }
 
 export function useTodos(): UseTodosReturn {
-  const { data, error, isLoading, mutate } = useSWR<Todo[]>(
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse<Todo[]>>(
     '/api/todos'
   );
 
   return {
-    todos: data ?? [],
+    todos: data?.success ? data.data : [],
     isLoading,
     error: error instanceof Error ? error.message : null,
     mutate,
